@@ -5,6 +5,10 @@ import '../../../core/theme/app_theme.dart';
 class EditorToolbar extends StatelessWidget {
   final EnglishDialect activeDialect;
   final ValueChanged<EnglishDialect> onDialectChanged;
+  final VoidCallback onOpenAi;
+  final VoidCallback onOpenInsights;
+  final VoidCallback onOpenHistory;
+  final VoidCallback onSaveDraft;
   final VoidCallback onCopy;
   final VoidCallback onClear;
   final VoidCallback onToggleTheme;
@@ -16,6 +20,10 @@ class EditorToolbar extends StatelessWidget {
     super.key,
     required this.activeDialect,
     required this.onDialectChanged,
+    required this.onOpenAi,
+    required this.onOpenInsights,
+    required this.onOpenHistory,
+    required this.onSaveDraft,
     required this.onCopy,
     required this.onClear,
     required this.onToggleTheme,
@@ -41,7 +49,7 @@ class EditorToolbar extends StatelessWidget {
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final isCompact = constraints.maxWidth < 600;
+          final isCompact = constraints.maxWidth < 780;
 
           return Row(
             children: [
@@ -113,46 +121,74 @@ class EditorToolbar extends StatelessWidget {
 
               const SizedBox(width: 12),
 
-              // Status indicator (shown if not super compact)
-              if (!isCompact)
-                Expanded(
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: isAnalyzing
-                              ? AppendixTheme.warningAmber
-                              : (issueCount > 0
-                                  ? AppendixTheme.errorRed
-                                  : AppendixTheme.successGreen),
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Flexible(
-                        child: Text(
-                          isAnalyzing
-                              ? 'Checking...'
-                              : (issueCount > 0
-                                  ? '$issueCount issues found'
-                                  : 'No errors found'),
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                            color: textSecondary,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                )
-              else
-                const Spacer(),
+              // Action Buttons: AI Assistant, Insights, History
+              FilledButton.tonalIcon(
+                icon: const Icon(Icons.auto_fix_high_rounded, size: 15),
+                label: Text(isCompact ? 'AI' : 'AI Rewrite'),
+                style: FilledButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                ),
+                onPressed: onOpenAi,
+              ),
 
-              // Action buttons
+              const SizedBox(width: 6),
+
+              IconButton(
+                visualDensity: VisualDensity.compact,
+                tooltip: 'Personal Writing Insights',
+                icon: const Icon(Icons.insights_rounded, size: 18),
+                onPressed: onOpenInsights,
+              ),
+
+              IconButton(
+                visualDensity: VisualDensity.compact,
+                tooltip: 'Saved Drafts & History',
+                icon: const Icon(Icons.history_rounded, size: 18),
+                onPressed: onOpenHistory,
+              ),
+
+              IconButton(
+                visualDensity: VisualDensity.compact,
+                tooltip: 'Save Draft Snapshot',
+                icon: const Icon(Icons.bookmark_add_outlined, size: 18),
+                onPressed: onSaveDraft,
+              ),
+
+              const Spacer(),
+
+              // Status indicator
+              if (!isCompact) ...[
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: isAnalyzing
+                        ? AppendixTheme.warningAmber
+                        : (issueCount > 0
+                            ? AppendixTheme.errorRed
+                            : AppendixTheme.successGreen),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  isAnalyzing
+                      ? 'Checking...'
+                      : (issueCount > 0
+                          ? '$issueCount issues found'
+                          : 'No errors found'),
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: textSecondary,
+                  ),
+                ),
+                const SizedBox(width: 12),
+              ],
+
+              // Utilities
               IconButton(
                 visualDensity: VisualDensity.compact,
                 tooltip: 'Copy text to clipboard',

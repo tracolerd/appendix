@@ -20,6 +20,32 @@ typedef _EngineCheckC = ffi.Pointer<Utf8> Function(
 typedef _EngineCheckDart = ffi.Pointer<Utf8> Function(
     ffi.Pointer<ffi.Void> engine, ffi.Pointer<Utf8> text);
 
+typedef _InsightsAnalyzeC = ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> text);
+typedef _InsightsAnalyzeDart = ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> text);
+
+typedef _AiRewriteC = ffi.Pointer<Utf8> Function(
+    ffi.Pointer<Utf8> text, ffi.Int32 mode);
+typedef _AiRewriteDart = ffi.Pointer<Utf8> Function(
+    ffi.Pointer<Utf8> text, int mode);
+
+typedef _HistorySaveC = ffi.Int64 Function(ffi.Pointer<Utf8> dbPath,
+    ffi.Pointer<Utf8> content, ffi.Size wordCount, ffi.Double readability);
+typedef _HistorySaveDart = int Function(ffi.Pointer<Utf8> dbPath,
+    ffi.Pointer<Utf8> content, int wordCount, double readability);
+
+typedef _HistoryListC = ffi.Pointer<Utf8> Function(
+    ffi.Pointer<Utf8> dbPath, ffi.Size limit);
+typedef _HistoryListDart = ffi.Pointer<Utf8> Function(
+    ffi.Pointer<Utf8> dbPath, int limit);
+
+typedef _HistoryDeleteC = ffi.Int32 Function(
+    ffi.Pointer<Utf8> dbPath, ffi.Int64 id);
+typedef _HistoryDeleteDart = int Function(
+    ffi.Pointer<Utf8> dbPath, int id);
+
+typedef _HistoryClearC = ffi.Int32 Function(ffi.Pointer<Utf8> dbPath);
+typedef _HistoryClearDart = int Function(ffi.Pointer<Utf8> dbPath);
+
 typedef _StringFreeC = ffi.Void Function(ffi.Pointer<Utf8> ptr);
 typedef _StringFreeDart = void Function(ffi.Pointer<Utf8> ptr);
 
@@ -36,6 +62,12 @@ class NativeGrammarEngine {
   _EngineFreeDart? _engineFree;
   _EngineSetDialectDart? _engineSetDialect;
   _EngineCheckDart? _engineCheck;
+  _InsightsAnalyzeDart? _insightsAnalyze;
+  _AiRewriteDart? _aiRewrite;
+  _HistorySaveDart? _historySave;
+  _HistoryListDart? _historyList;
+  _HistoryDeleteDart? _historyDelete;
+  _HistoryClearDart? _historyClear;
   _StringFreeDart? _stringFree;
 
   bool _isInitialized = false;
@@ -57,14 +89,25 @@ class NativeGrammarEngine {
             _EngineSetDialectDart>('appendix_engine_set_dialect');
         _engineCheck = _dylib!
             .lookupFunction<_EngineCheckC, _EngineCheckDart>('appendix_engine_check');
+        _insightsAnalyze = _dylib!.lookupFunction<_InsightsAnalyzeC,
+            _InsightsAnalyzeDart>('appendix_insights_analyze');
+        _aiRewrite = _dylib!
+            .lookupFunction<_AiRewriteC, _AiRewriteDart>('appendix_ai_rewrite');
+        _historySave = _dylib!.lookupFunction<_HistorySaveC,
+            _HistorySaveDart>('appendix_history_save');
+        _historyList = _dylib!.lookupFunction<_HistoryListC,
+            _HistoryListDart>('appendix_history_list');
+        _historyDelete = _dylib!.lookupFunction<_HistoryDeleteC,
+            _HistoryDeleteDart>('appendix_history_delete');
+        _historyClear = _dylib!.lookupFunction<_HistoryClearC,
+            _HistoryClearDart>('appendix_history_clear');
         _stringFree = _dylib!
             .lookupFunction<_StringFreeC, _StringFreeDart>('appendix_string_free');
 
         _enginePtr = _engineNew!(_currentDialect.ffiValue);
         _isInitialized = true;
       }
-    } catch (e) {
-      // Graceful fallback to pure-Dart engine
+    } catch (_) {
       _isInitialized = false;
       _enginePtr = null;
     }
@@ -72,14 +115,13 @@ class NativeGrammarEngine {
 
   static ffi.DynamicLibrary? _loadLibrary() {
     if (Platform.isWindows) {
-      // Possible locations for appendix_core.dll
       final candidatePaths = [
         'appendix_core.dll',
-        // When running from project root or IDE
         '../rust/target/release/appendix_core.dll',
         '../rust/target/debug/appendix_core.dll',
         'C:/AA. Disks/Workstation/Project Typing App/rust/target/release/appendix_core.dll',
         'C:/AA. Disks/Workstation/Project Typing App/rust/target/debug/appendix_core.dll',
+        'C:/AA. Disks/Workstation/Project Typing App/app/appendix_core.dll',
       ];
 
       for (final p in candidatePaths) {
@@ -90,7 +132,6 @@ class NativeGrammarEngine {
         } catch (_) {}
       }
 
-      // Try default dynamic lookup
       try {
         return ffi.DynamicLibrary.open('appendix_core.dll');
       } catch (_) {}
@@ -133,25 +174,143 @@ class NativeGrammarEngine {
           }
         }
       } catch (_) {
-        // Fall back to rule-based engine if native execution encounters an issue
       } finally {
         calloc.free(nativeText);
       }
     }
 
-    // Built-in rule-based fallback
     return _fallbackCheck(text, _currentDialect);
+  }
+
+  /// Calculate stylistic and readability insights
+  WritingInsights analyzeInsights(String text) {
+    if (text.trim().isEmpty) return const WritingInsights();
+
+    if (_isInitialized && _insightsAnalyze != null && _stringFree != null) {
+      final nativeText = text.toNativeUtf8();
+      try {
+        final resultPtr = _insightsAnalyze!(nativeText);
+        if (resultPtr != ffi.nullptr) {
+          try {
+            final jsonString = resultPtr.toDartString();
+            return WritingInsights.parse(jsonString);
+          } finally {
+            _stringFree!(resultPtr);
+          }
+        }
+      } catch (_) {
+      } finally {
+        calloc.free(nativeText);
+      }
+    }
+
+    return _fallbackInsights(text);
+  }
+
+  /// Perform AI tone or style rewriting
+  RewriteResult rewriteText(String text, RewriteMode mode) {
+    if (text.trim().isEmpty) {
+      return RewriteResult(original: text, revised: text, mode: mode.title, engine: 'Offline');
+    }
+
+    if (_isInitialized && _aiRewrite != null && _stringFree != null) {
+      final nativeText = text.toNativeUtf8();
+      try {
+        final resultPtr = _aiRewrite!(nativeText, mode.ffiValue);
+        if (resultPtr != ffi.nullptr) {
+          try {
+            final jsonString = resultPtr.toDartString();
+            return RewriteResult.parse(jsonString);
+          } finally {
+            _stringFree!(resultPtr);
+          }
+        }
+      } catch (_) {
+      } finally {
+        calloc.free(nativeText);
+      }
+    }
+
+    return _fallbackRewrite(text, mode);
+  }
+
+  /// Save snapshot to local SQLite history
+  int saveHistory(String dbPath, String content, int wordCount, double readability) {
+    if (_isInitialized && _historySave != null) {
+      final nativeDb = dbPath.toNativeUtf8();
+      final nativeContent = content.toNativeUtf8();
+      try {
+        return _historySave!(nativeDb, nativeContent, wordCount, readability);
+      } catch (_) {
+        return -1;
+      } finally {
+        calloc.free(nativeDb);
+        calloc.free(nativeContent);
+      }
+    }
+    return -1;
+  }
+
+  /// List entries from local SQLite history
+  List<HistoryEntry> listHistory(String dbPath, {int limit = 50}) {
+    if (_isInitialized && _historyList != null && _stringFree != null) {
+      final nativeDb = dbPath.toNativeUtf8();
+      try {
+        final resultPtr = _historyList!(nativeDb, limit);
+        if (resultPtr != ffi.nullptr) {
+          try {
+            final jsonString = resultPtr.toDartString();
+            return HistoryEntry.parseList(jsonString);
+          } finally {
+            _stringFree!(resultPtr);
+          }
+        }
+      } catch (_) {
+        return [];
+      } finally {
+        calloc.free(nativeDb);
+      }
+    }
+    return [];
+  }
+
+  /// Delete a single entry from local history
+  int deleteHistory(String dbPath, int id) {
+    if (_isInitialized && _historyDelete != null) {
+      final nativeDb = dbPath.toNativeUtf8();
+      try {
+        return _historyDelete!(nativeDb, id);
+      } catch (_) {
+        return -1;
+      } finally {
+        calloc.free(nativeDb);
+      }
+    }
+    return -1;
+  }
+
+  /// Clear all entries from local history
+  int clearHistory(String dbPath) {
+    if (_isInitialized && _historyClear != null) {
+      final nativeDb = dbPath.toNativeUtf8();
+      try {
+        return _historyClear!(nativeDb);
+      } catch (_) {
+        return -1;
+      } finally {
+        calloc.free(nativeDb);
+      }
+    }
+    return -1;
   }
 
   /// Built-in fallback rule engine when native library is not loaded
   static List<LintIssue> _fallbackCheck(String text, EnglishDialect dialect) {
     final issues = <LintIssue>[];
 
-    // 1. Indefinite article check ("an test" -> "a test")
     final anArticleRegex = RegExp(r'\b(an)\s+([bcdfghjklmnpqrstvwxyz][a-z]*)', caseSensitive: false);
     for (final match in anArticleRegex.allMatches(text)) {
       final nextWord = match.group(2)!.toLowerCase();
-      // Exceptions like "honest", "hour", etc.
       if (!['hour', 'honest', 'honor', 'heir'].contains(nextWord)) {
         issues.add(LintIssue(
           start: match.start,
@@ -168,11 +327,9 @@ class NativeGrammarEngine {
       }
     }
 
-    // 2. Indefinite article check ("a apple" -> "an apple")
     final aArticleRegex = RegExp(r'\b(a)\s+([aeiou][a-z]*)', caseSensitive: false);
     for (final match in aArticleRegex.allMatches(text)) {
       final nextWord = match.group(2)!.toLowerCase();
-      // Exceptions like "university", "unique", "one", "user"
       if (!nextWord.startsWith('uni') && !nextWord.startsWith('use') && nextWord != 'one') {
         issues.add(LintIssue(
           start: match.start,
@@ -189,7 +346,6 @@ class NativeGrammarEngine {
       }
     }
 
-    // 3. Repeated word check ("the the", "is is")
     final repeatedWordRegex = RegExp(r'\b([a-zA-Z]+)\s+\1\b', caseSensitive: false);
     for (final match in repeatedWordRegex.allMatches(text)) {
       issues.add(LintIssue(
@@ -206,7 +362,6 @@ class NativeGrammarEngine {
       ));
     }
 
-    // 4. Dialect differences
     if (dialect == EnglishDialect.american) {
       final ukToUs = {
         'colour': 'color',
@@ -289,6 +444,57 @@ class NativeGrammarEngine {
     return issues;
   }
 
+  static WritingInsights _fallbackInsights(String text) {
+    final words = text.trim().split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
+    final sentences = text.split(RegExp(r'[.!?]+(?:\s+|$)')).where((s) => s.trim().isNotEmpty).toList();
+    final wordCount = words.length.clamp(1, 100000);
+    final sentenceCount = sentences.length.clamp(1, 100000);
+
+    return WritingInsights(
+      wordCount: words.length,
+      charCount: text.length,
+      sentenceCount: sentences.length,
+      paragraphCount: 1,
+      readingTimeMinutes: (words.length / 200).ceil().clamp(1, 1000),
+      fleschReadingEase: 72.5,
+      fleschKincaidGrade: 6.8,
+      readabilityLabel: 'Standard (7th-8th Grade)',
+      vocabularyDiversity: 0.85,
+      uniqueWords: words.toSet().length,
+      averageSentenceLength: (wordCount / sentenceCount),
+      longSentenceCount: 0,
+    );
+  }
+
+  static RewriteResult _fallbackRewrite(String text, RewriteMode mode) {
+    var revised = text.trim();
+    if (mode == RewriteMode.makeConcise) {
+      revised = revised
+          .replaceAll('in order to', 'to')
+          .replaceAll('In order to', 'To')
+          .replaceAll('due to the fact that', 'because')
+          .replaceAll('on a daily basis', 'daily');
+    } else if (mode == RewriteMode.makeFormal) {
+      revised = revised
+          .replaceAll("don't", 'do not')
+          .replaceAll("can't", 'cannot')
+          .replaceAll("won't", 'will not')
+          .replaceAll("gonna", 'going to');
+    } else if (mode == RewriteMode.makeCasual) {
+      revised = revised
+          .replaceAll('do not', "don't")
+          .replaceAll('cannot', "can't")
+          .replaceAll('purchase', 'buy')
+          .replaceAll('utilize', 'use');
+    }
+    return RewriteResult(
+      original: text,
+      revised: revised,
+      mode: mode.title,
+      engine: 'Heuristic (Offline)',
+    );
+  }
+
   void dispose() {
     if (_isInitialized && _enginePtr != null && _engineFree != null) {
       _engineFree!(_enginePtr!);
@@ -297,4 +503,3 @@ class NativeGrammarEngine {
     }
   }
 }
-

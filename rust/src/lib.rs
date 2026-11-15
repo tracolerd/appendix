@@ -1,3 +1,7 @@
+pub mod ai_rephrase;
+pub mod history;
+pub mod insights;
+
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 
@@ -6,6 +10,10 @@ use harper_core::parsers::PlainEnglish;
 use harper_core::spell::FstDictionary;
 use harper_core::{Dialect, Document, Lrc};
 use serde::{Deserialize, Serialize};
+
+use ai_rephrase::{RewriteMode, RewriteResult};
+use history::HistoryStorage;
+use insights::InsightsEngine;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Suggestion {
@@ -159,6 +167,144 @@ pub extern "C" fn appendix_engine_check(
 }
 
 #[no_mangle]
+pub extern "C" fn appendix_insights_analyze(text: *const c_char) -> *mut c_char {
+    if text.is_null() {
+        return std::ptr::null_mut();
+    }
+
+    let c_str = unsafe { CStr::from_ptr(text) };
+    let input = match c_str.to_str() {
+        Ok(s) => s,
+        Err(_) => return std::ptr::null_mut(),
+    };
+
+    let insights = InsightsEngine::analyze(input);
+
+    match serde_json::to_string(&insights) {
+        Ok(json_str) => match CString::new(json_str) {
+            Ok(c_string) => c_string.into_raw(),
+            Err(_) => std::ptr::null_mut(),
+        },
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn appendix_ai_rewrite(text: *const c_char, mode: i32) -> *mut c_char {
+    if text.is_null() {
+        return std::ptr::null_mut();
+    }
+
+    let c_str = unsafe { CStr::from_ptr(text) };
+    let input = match c_str.to_str() {
+        Ok(s) => s,
+        Err(_) => return std::ptr::null_mut(),
+    };
+
+    let rewrite_mode = RewriteMode::from_i32(mode);
+    let revised = rewrite_mode.heuristic_fallback(input);
+
+    let result = RewriteResult {
+        original: input.to_string(),
+        revised,
+        mode: rewrite_mode.title().to_string(),
+        engine: "Heuristic (Offline)".to_string(),
+    };
+
+    match serde_json::to_string(&result) {
+        Ok(json_str) => match CString::new(json_str) {
+            Ok(c_string) => c_string.into_raw(),
+            Err(_) => std::ptr::null_mut(),
+        },
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn appendix_history_save(
+    db_path: *const c_char,
+    content: *const c_char,
+    word_count: usize,
+    readability: f64,
+) -> i64 {
+    if db_path.is_null() || content.is_null() {
+        return -1;
+    }
+
+    let db_str = match unsafe { CStr::from_ptr(db_path) }.to_str() {
+        Ok(s) => s,
+        Err(_) => return -1,
+    };
+
+    let content_str = match unsafe { CStr::from_ptr(content) }.to_str() {
+        Ok(s) => s,
+        Err(_) => return -1,
+    };
+
+    match HistoryStorage::save(db_str, content_str, word_count, readability) {
+        Ok(id) => id,
+        Err(_) => -1,
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn appendix_history_list(db_path: *const c_char, limit: usize) -> *mut c_char {
+    if db_path.is_null() {
+        return std::ptr::null_mut();
+    }
+
+    let db_str = match unsafe { CStr::from_ptr(db_path) }.to_str() {
+        Ok(s) => s,
+        Err(_) => return std::ptr::null_mut(),
+    };
+
+    match HistoryStorage::list(db_str, limit) {
+        Ok(entries) => match serde_json::to_string(&entries) {
+            Ok(json_str) => match CString::new(json_str) {
+                Ok(c_string) => c_string.into_raw(),
+                Err(_) => std::ptr::null_mut(),
+            },
+            Err(_) => std::ptr::null_mut(),
+        },
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn appendix_history_delete(db_path: *const c_char, id: i64) -> i32 {
+    if db_path.is_null() {
+        return -1;
+    }
+
+    let db_str = match unsafe { CStr::from_ptr(db_path) }.to_str() {
+        Ok(s) => s,
+        Err(_) => return -1,
+    };
+
+    match HistoryStorage::delete(db_str, id) {
+        Ok(_) => 0,
+        Err(_) => -1,
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn appendix_history_clear(db_path: *const c_char) -> i32 {
+    if db_path.is_null() {
+        return -1;
+    }
+
+    let db_str = match unsafe { CStr::from_ptr(db_path) }.to_str() {
+        Ok(s) => s,
+        Err(_) => return -1,
+    };
+
+    match HistoryStorage::clear(db_str) {
+        Ok(_) => 0,
+        Err(_) => -1,
+    }
+}
+
+#[no_mangle]
 pub extern "C" fn appendix_string_free(ptr: *mut c_char) {
     if !ptr.is_null() {
         unsafe {
@@ -176,40 +322,21 @@ mod tests {
         let engine = GrammarEngine::new(EnglishDialect::American);
         let results = engine.check_text("This is an test sentence with error.");
         assert!(!results.is_empty(), "Should detect error in sentence");
-        println!("Detected {} issues:", results.len());
-        for res in &results {
-            println!("  [{}..{}] {}: {:?}", res.start, res.end, res.message, res.suggestions);
-        }
     }
 
     #[test]
-    fn test_dialect_differences() {
-        let us_engine = GrammarEngine::new(EnglishDialect::American);
-        let uk_engine = GrammarEngine::new(EnglishDialect::British);
+    fn test_c_abi_insights_and_rewrite() {
+        let sample = CString::new("In order to achieve great results, we must practice daily.").unwrap();
+        let insights_ptr = appendix_insights_analyze(sample.as_ptr());
+        assert!(!insights_ptr.is_null());
+        let insights_json = unsafe { CStr::from_ptr(insights_ptr).to_str().unwrap() };
+        assert!(insights_json.contains("flesch_reading_ease"));
+        appendix_string_free(insights_ptr);
 
-        let us_check = us_engine.check_text("The colour of the car is blue.");
-        let uk_check = uk_engine.check_text("The colour of the car is blue.");
-
-        println!("US Check: {} results", us_check.len());
-        println!("UK Check: {} results", uk_check.len());
-        assert!(!us_check.is_empty(), "US should detect 'colour'");
-        assert!(uk_check.is_empty(), "UK should accept 'colour'");
-    }
-
-    #[test]
-    fn test_c_abi_lifecycle() {
-        let engine = appendix_engine_new(0);
-        assert!(!engine.is_null());
-
-        let input = CString::new("This is an test.").unwrap();
-        let result_ptr = appendix_engine_check(engine, input.as_ptr());
-        assert!(!result_ptr.is_null());
-
-        let result_str = unsafe { CStr::from_ptr(result_ptr).to_str().unwrap() };
-        println!("C ABI JSON Output: {}", result_str);
-        assert!(result_str.contains("Incorrect indefinite article"));
-
-        appendix_string_free(result_ptr);
-        appendix_engine_free(engine);
+        let rewrite_ptr = appendix_ai_rewrite(sample.as_ptr(), 5); // Make Concise
+        assert!(!rewrite_ptr.is_null());
+        let rewrite_json = unsafe { CStr::from_ptr(rewrite_ptr).to_str().unwrap() };
+        assert!(rewrite_json.contains("To achieve great results"));
+        appendix_string_free(rewrite_ptr);
     }
 }

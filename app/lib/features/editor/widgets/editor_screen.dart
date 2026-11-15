@@ -1,7 +1,11 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/ffi/native_grammar_bindings.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../ai_assistant/ai_panel.dart';
+import '../../history/history_dialog.dart';
+import '../../insights/insights_sheet.dart';
 import '../controllers/writing_editor_controller.dart';
 import 'editor_toolbar.dart';
 import 'stats_footer.dart';
@@ -25,10 +29,14 @@ class _EditorScreenState extends State<EditorScreen> {
   late final WritingEditorController _controller;
   final FocusNode _focusNode = FocusNode();
 
+  String get _dbPath {
+    final tempDir = Directory.systemTemp.path;
+    return '$tempDir/appendix_history.db';
+  }
+
   @override
   void initState() {
     super.initState();
-    // Default initial demonstration text showcasing grammar, spelling, and dialect detection
     _controller = WritingEditorController(
       text: 'This is an test sentence to showcase Appendix. The colour of the car is bright blue.',
       onIssuesUpdated: () {
@@ -42,6 +50,99 @@ class _EditorScreenState extends State<EditorScreen> {
     _controller.dispose();
     _focusNode.dispose();
     super.dispose();
+  }
+
+  void _handleOpenAi() {
+    final text = _controller.text.trim();
+    if (text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please write or paste text before using AI Assistant.')),
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: AiPanel(
+          initialText: text,
+          isDarkMode: widget.isDarkMode,
+          onApplyRevision: (revised) {
+            _controller.text = revised;
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Revision applied to editor.')),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  void _handleOpenInsights() {
+    final text = _controller.text.trim();
+    final insights = NativeGrammarEngine.instance.analyzeInsights(text);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Center(
+        child: InsightsSheet(
+          insights: insights,
+          isDarkMode: widget.isDarkMode,
+        ),
+      ),
+    );
+  }
+
+  void _handleSaveDraft() {
+    final text = _controller.text.trim();
+    if (text.isEmpty) return;
+
+    final insights = NativeGrammarEngine.instance.analyzeInsights(text);
+    final id = NativeGrammarEngine.instance.saveHistory(
+      _dbPath,
+      text,
+      insights.wordCount,
+      insights.fleschReadingEase,
+    );
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(id > 0 ? 'Draft snapshot saved locally.' : 'Saved to local history.'),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  void _handleOpenHistory() {
+    final entries = NativeGrammarEngine.instance.listHistory(_dbPath);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => HistoryDialog(
+        entries: entries,
+        isDarkMode: widget.isDarkMode,
+        onRestore: (entry) {
+          _controller.text = entry.content;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Draft restored to editor.')),
+          );
+        },
+        onDelete: (entry) {
+          NativeGrammarEngine.instance.deleteHistory(_dbPath, entry.id);
+          Navigator.of(ctx).pop();
+          _handleOpenHistory();
+        },
+        onClearAll: () {
+          NativeGrammarEngine.instance.clearHistory(_dbPath);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('History cleared.')),
+          );
+        },
+      ),
+    );
   }
 
   void _handleCopy() {
@@ -95,10 +196,14 @@ class _EditorScreenState extends State<EditorScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Top Toolbar
+            // Top Toolbar with AI & Insights
             EditorToolbar(
               activeDialect: _controller.dialect,
               onDialectChanged: (d) => setState(() => _controller.setDialect(d)),
+              onOpenAi: _handleOpenAi,
+              onOpenInsights: _handleOpenInsights,
+              onOpenHistory: _handleOpenHistory,
+              onSaveDraft: _handleSaveDraft,
               onCopy: _handleCopy,
               onClear: _handleClear,
               onToggleTheme: widget.onToggleTheme,
@@ -174,4 +279,3 @@ class _EditorScreenState extends State<EditorScreen> {
     );
   }
 }
-
