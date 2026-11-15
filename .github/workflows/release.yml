@@ -5,8 +5,9 @@ on:
     tags:
       - 'v*.*.*'
 
+# Default to least-privilege read permissions across all jobs
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build-windows:
@@ -24,17 +25,20 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.50.0'
           channel: 'stable'
 
-      - name: Build Rust Core DLL
+      - name: Build Rust Core Release DLL
         working-directory: rust
         run: cargo build --release
 
-      - name: Copy DLL to App
-        run: copy rust\target\release\appendix_core.dll app\appendix_core.dll
+      - name: Copy DLL to Flutter Windows Runner
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "app\windows"
+          Copy-Item "rust\target\release\appendix_core.dll" "app\appendix_core.dll" -Force
+          Copy-Item "rust\target\release\appendix_core.dll" "app\windows\appendix_core.dll" -Force
 
-      - name: Build Flutter Windows
+      - name: Build Flutter Windows Desktop
         working-directory: app
         run: |
           flutter pub get
@@ -47,10 +51,11 @@ jobs:
           $dist = "dist\appendix-windows-x64-$ver"
           New-Item -ItemType Directory -Force -Path $dist
           Copy-Item -Path "app\build\windows\x64\runner\Release\*" -Destination $dist -Recurse
-          Copy-Item -Path "app\appendix_core.dll" -Destination $dist -Force
-          Copy-Item -Path "LICENSE", "README.md" -Destination $dist
+          # Ensure DLL sits directly alongside the runner executable
+          Copy-Item -Path "rust\target\release\appendix_core.dll" -Destination $dist -Force
+          Copy-Item -Path "LICENSE", "README.md", "THIRD_PARTY_NOTICES.md", "INSTALL_WINDOWS.md" -Destination $dist -ErrorAction SilentlyContinue
           Compress-Archive -Path "$dist\*" -DestinationPath "dist\appendix-windows-x64.zip" -Force
-          Get-FileHash -Path "dist\appendix-windows-x64.zip" -Algorithm SHA256 | Out-File "dist\appendix-windows-x64.sha256"
+          Get-FileHash -Path "dist\appendix-windows-x64.zip" -Algorithm SHA256 | ForEach-Object { "$($_.Hash.ToLower())  appendix-windows-x64.zip" } | Out-File -Encoding ascii "dist\appendix-windows-x64.sha256"
 
       - name: Upload Windows Artifact
         uses: actions/upload-artifact@v4
@@ -59,7 +64,7 @@ jobs:
           path: dist/appendix-windows-x64.*
 
   build-android:
-    name: Build Android Release APK
+    name: Build Android Release Packages (APK & AAB)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
@@ -74,10 +79,9 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.50.0'
           channel: 'stable'
 
-      - name: Setup Rust & Targets
+      - name: Setup Rust & Android NDK Targets
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-linux-android, x86_64-linux-android
@@ -85,25 +89,54 @@ jobs:
       - name: Install cargo-ndk
         run: cargo install cargo-ndk
 
-      - name: Compile Rust Core for Android
+      - name: Compile Rust Core for Android (arm64-v8a & x86_64)
         working-directory: rust
         run: cargo ndk -t arm64-v8a -t x86_64 -o ../app/android/app/src/main/jniLibs build --release
 
-      - name: Build Android APK
-        working-directory: app
-        run: flutter build apk --release
+      - name: Configure Production Signing (Optional Secrets Fallback)
+        # If GitHub Secrets are configured (KEYSTORE_BASE64, KEY_ALIAS, KEY_PASSWORD, STORE_PASSWORD),
+        # decode the keystore and pass variables. Otherwise, build.gradle.kts falls back gracefully
+        # to the debug keystore for validation builds.
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "Production keystore secret detected. Decoding..."
+            echo "$KEYSTORE_BASE64" | base64 -d > app/android/release.keystore
+            echo "KEYSTORE_PATH=release.keystore" >> $GITHUB_ENV
+            echo "KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" >> $GITHUB_ENV
+            echo "KEY_ALIAS=$KEY_ALIAS" >> $GITHUB_ENV
+            echo "KEY_PASSWORD=$KEY_PASSWORD" >> $GITHUB_ENV
+          else
+            echo "No production keystore secrets configured; build will proceed with debug-signed validation package."
+          fi
 
-      - name: Package Android Artifact
+      - name: Build Android Release APK
+        working-directory: app
+        run: |
+          flutter pub get
+          flutter build apk --release
+
+      - name: Build Android Release AppBundle (AAB)
+        working-directory: app
+        run: flutter build appbundle --release
+
+      - name: Package Android Artifacts
         run: |
           mkdir -p dist
           cp app/build/app/outputs/flutter-apk/app-release.apk dist/appendix-android.apk
-          sha256sum dist/appendix-android.apk > dist/appendix-android.sha256
+          cp app/build/app/outputs/bundle/release/app-release.aab dist/appendix-android.aab
+          sha256sum dist/appendix-android.apk | sed 's|dist/||' > dist/appendix-android-apk.sha256
+          sha256sum dist/appendix-android.aab | sed 's|dist/||' > dist/appendix-android-aab.sha256
 
-      - name: Upload Android Artifact
+      - name: Upload Android Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: appendix-android
-          path: dist/appendix-android.*
+          path: dist/appendix-android*
 
   build-macos:
     name: Build macOS Universal Release
@@ -120,7 +153,6 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.50.0'
           channel: 'stable'
 
       - name: Compile macOS Universal dylib
@@ -128,6 +160,7 @@ jobs:
         run: |
           cargo build --release --target aarch64-apple-darwin
           cargo build --release --target x86_64-apple-darwin
+          mkdir -p ../app/macos
           lipo -create \
             target/aarch64-apple-darwin/release/libappendix_core.dylib \
             target/x86_64-apple-darwin/release/libappendix_core.dylib \
@@ -142,8 +175,9 @@ jobs:
       - name: Package macOS Artifact
         run: |
           mkdir -p dist
+          cp LICENSE README.md THIRD_PARTY_NOTICES.md INSTALL_MACOS.md app/build/macos/Build/Products/Release/ 2>/dev/null || true
           (cd app/build/macos/Build/Products/Release && zip -r -y "${GITHUB_WORKSPACE}/dist/appendix-macos.zip" appendix.app)
-          shasum -a 256 dist/appendix-macos.zip > dist/appendix-macos.sha256
+          shasum -a 256 dist/appendix-macos.zip | sed 's|dist/||' > dist/appendix-macos.sha256
 
       - name: Upload macOS Artifact
         uses: actions/upload-artifact@v4
@@ -151,10 +185,47 @@ jobs:
           name: appendix-macos
           path: dist/appendix-macos.*
 
+  validate-ios:
+    name: Validate iOS App & Embedded Keyboard Extension
+    runs-on: macos-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust & iOS Targets
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios, aarch64-apple-ios-sim, x86_64-apple-ios
+
+      - name: Build Apple Platforms (XCFramework)
+        run: |
+          chmod +x scripts/build_apple.sh
+          ./scripts/build_apple.sh
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      - name: Install Dependencies
+        working-directory: app
+        run: flutter pub get
+
+      - name: Validate iOS App & Keyboard Extension Build
+        run: |
+          xcodebuild -workspace app/ios/Runner.xcworkspace \
+            -scheme Runner \
+            -sdk iphonesimulator \
+            -configuration Release \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
   publish-release:
     name: Publish GitHub Release
-    needs: [build-windows, build-android, build-macos]
+    needs: [build-windows, build-android, build-macos, validate-ios]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -165,7 +236,7 @@ jobs:
           name: appendix-windows-x64
           path: release_assets
 
-      - name: Download Android Artifact
+      - name: Download Android Artifacts
         uses: actions/download-artifact@v4
         with:
           name: appendix-android
@@ -177,8 +248,10 @@ jobs:
           name: appendix-macos
           path: release_assets
 
-      - name: Create Combined Checksums
+      - name: Create Combined Checksums & Add Release Manifests
         run: |
+          cp THIRD_PARTY_NOTICES.md release_assets/
+          cp models/model_manifest.json release_assets/
           cd release_assets
           cat *.sha256 > SHA256SUMS.txt
           rm -f *.sha256

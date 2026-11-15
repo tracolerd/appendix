@@ -45,6 +45,9 @@ Cargo.lock
 **/android/**/GeneratedPluginRegistrant.java
 **/android/key.properties
 *.jks
+*.keystore
+dist/
+/dist/
 
 # iOS/macOS specific
 **/ios/**/*.mode1v3

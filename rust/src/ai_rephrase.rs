@@ -199,6 +199,54 @@ impl RewriteMode {
                 }
                 s
             }
+            RewriteMode::MakeCasual => {
+                let mut s = trimmed.to_string();
+                let replacements = [
+                    ("do not", "don't"),
+                    ("cannot", "can't"),
+                    ("will not", "won't"),
+                    ("did not", "didn't"),
+                    ("is not", "isn't"),
+                    ("are not", "aren't"),
+                    ("have not", "haven't"),
+                    ("has not", "hasn't"),
+                    ("would not", "wouldn't"),
+                    ("could not", "couldn't"),
+                    ("should not", "shouldn't"),
+                    ("utilize", "use"),
+                    ("purchase", "buy"),
+                    ("obtain", "get"),
+                    ("inform", "tell"),
+                    ("commence", "start"),
+                    ("terminate", "end"),
+                ];
+                for (from, to) in replacements {
+                    s = s.replace(from, to);
+                    let cap_from = format!("{}{}", &from[..1].to_uppercase(), &from[1..]);
+                    let cap_to = format!("{}{}", &to[..1].to_uppercase(), &to[1..]);
+                    s = s.replace(&cap_from, &cap_to);
+                }
+                s
+            }
+            RewriteMode::Simplify => {
+                let mut s = trimmed.to_string();
+                let replacements = [
+                    ("utilize", "use"),
+                    ("facilitate", "help"),
+                    ("implement", "carry out"),
+                    ("subsequently", "later"),
+                    ("commence", "start"),
+                    ("terminate", "end"),
+                    ("in order to", "to"),
+                ];
+                for (from, to) in replacements {
+                    s = s.replace(from, to);
+                    let cap_from = format!("{}{}", &from[..1].to_uppercase(), &from[1..]);
+                    let cap_to = format!("{}{}", &to[..1].to_uppercase(), &to[1..]);
+                    s = s.replace(&cap_from, &cap_to);
+                }
+                s
+            }
             _ => trimmed.to_string(),
         }
     }
@@ -249,5 +297,14 @@ mod tests {
         let output = mode.heuristic_fallback(input);
         assert!(output.contains("To succeed"));
         assert!(output.contains("daily"));
+    }
+
+    #[test]
+    fn test_heuristic_fallback_casual() {
+        let mode = RewriteMode::MakeCasual;
+        let input = "You must utilize this tool and do not delay.";
+        let output = mode.heuristic_fallback(input);
+        assert!(output.contains("use this tool"));
+        assert!(output.contains("don't delay"));
     }
 }

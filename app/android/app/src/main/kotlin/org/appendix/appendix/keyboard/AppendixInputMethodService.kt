@@ -38,6 +38,9 @@ class AppendixInputMethodService : InputMethodService() {
     private var isCapsLock = false
     private var isSymbols = false
     private var currentDialect = 0 // 0 = American, 1 = British
+    private var isPasswordField = false
+    private var isSpecializedField = false
+    private var currentCheckRequestId: Long = 0L
 
     private val mainHandler = Handler(Looper.getMainLooper())
     private var checkDebounceRunnable: Runnable? = null
@@ -113,8 +116,72 @@ class AppendixInputMethodService : InputMethodService() {
         isShifted = false
         isCapsLock = false
         isSymbols = false
+
+        classifyInputType(info)
         renderKeyboardLayout()
         scheduleGrammarCheck(100)
+    }
+
+    private fun classifyInputType(info: EditorInfo?) {
+        if (info == null) {
+            isPasswordField = false
+            isSpecializedField = false
+            return
+        }
+
+        val inputType = info.inputType
+        val klass = inputType and android.text.InputType.TYPE_MASK_CLASS
+        val variation = inputType and android.text.InputType.TYPE_MASK_VARIATION
+
+        // 1. Password detection (Strict bitmask evaluation)
+        isPasswordField = when (klass) {
+            android.text.InputType.TYPE_CLASS_TEXT -> {
+                variation == android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD ||
+                variation == android.text.InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD ||
+                variation == android.text.InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD
+            }
+            android.text.InputType.TYPE_CLASS_NUMBER -> {
+                variation == android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD
+            }
+            else -> false
+        }
+
+        // 2. Specialized input classification
+        // Numeric, Phone, Date/Time, URI, and Email fields conservatively disable sentence-level grammar checking
+        isSpecializedField = when {
+            isPasswordField -> true
+            klass == android.text.InputType.TYPE_CLASS_NUMBER -> true
+            klass == android.text.InputType.TYPE_CLASS_PHONE -> true
+            klass == android.text.InputType.TYPE_CLASS_DATETIME -> true
+            klass == android.text.InputType.TYPE_CLASS_TEXT -> {
+                variation == android.text.InputType.TYPE_TEXT_VARIATION_URI ||
+                variation == android.text.InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS ||
+                variation == android.text.InputType.TYPE_TEXT_VARIATION_WEB_EMAIL_ADDRESS ||
+                variation == android.text.InputType.TYPE_TEXT_VARIATION_FILTER
+            }
+            else -> false
+        }
+
+        // Automatically present symbols/numeric keypad for numeric, phone, or date/time fields
+        if (klass == android.text.InputType.TYPE_CLASS_NUMBER ||
+            klass == android.text.InputType.TYPE_CLASS_PHONE ||
+            klass == android.text.InputType.TYPE_CLASS_DATETIME
+        ) {
+            isSymbols = true
+        }
+    }
+
+    private fun showSensitiveFieldStatus() {
+        candidateContainer.removeAllViews()
+        val badge = TextView(this).apply {
+            text = "Appendix 🔒 Password (Privacy Protected)"
+            setTextColor(Color.parseColor("#94A3B8"))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            typeface = Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
+            setPadding(dp(12), dp(4), dp(12), dp(4))
+        }
+        candidateContainer.addView(badge)
     }
 
     // ==========================================
@@ -152,8 +219,9 @@ class AppendixInputMethodService : InputMethodService() {
         candidateContainer.removeAllViews()
 
         val dialectLabel = if (currentDialect == 1) "EN-GB" else "EN-US"
+        val engineStatus = if (NativeEngine.isAvailable() && enginePtr != 0L) "Offline ($dialectLabel)" else "Engine Unavailable"
         val badge = TextView(this).apply {
-            text = "Appendix 🛡️ Offline ($dialectLabel)"
+            text = "Appendix 🛡️ $engineStatus"
             setTextColor(Color.parseColor("#7E8B9B"))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
             typeface = Typeface.DEFAULT_BOLD
@@ -230,6 +298,14 @@ class AppendixInputMethodService : InputMethodService() {
     private fun scheduleGrammarCheck(delayMs: Long = 250) {
         checkDebounceRunnable?.let { mainHandler.removeCallbacks(it) }
         checkDebounceRunnable = Runnable {
+            if (isPasswordField) {
+                showSensitiveFieldStatus()
+                return@Runnable
+            }
+            if (isSpecializedField) {
+                showDefaultCandidateStatus()
+                return@Runnable
+            }
             val ic = currentInputConnection ?: return@Runnable
             val textBefore = ic.getTextBeforeCursor(300, 0)?.toString() ?: ""
             if (textBefore.isBlank()) {
@@ -237,11 +313,18 @@ class AppendixInputMethodService : InputMethodService() {
                 return@Runnable
             }
 
+            val requestId = ++currentCheckRequestId
             // Perform check on background thread
             Thread {
                 val lints = runGrammarCheck(textBefore)
                 mainHandler.post {
-                    displaySuggestions(lints)
+                    // Stale check: ensure request ID still matches and context hasn't changed
+                    if (requestId == currentCheckRequestId) {
+                        val currentText = currentInputConnection?.getTextBeforeCursor(300, 0)?.toString() ?: ""
+                        if (currentText == textBefore) {
+                            displaySuggestions(lints)
+                        }
+                    }
                 }
             }.start()
         }
@@ -284,26 +367,7 @@ class AppendixInputMethodService : InputMethodService() {
                 Log.e(TAG, "Error executing native Harper check: ${t.message}")
             }
         } else {
-            // Fallback quick heuristics for common typos
-            val words = contextText.trim().split(Regex("\\s+"))
-            if (words.isNotEmpty()) {
-                val lastWord = words.last().lowercase().replace(Regex("[^a-z]"), "")
-                val commonFixes = mapOf(
-                    "teh" to "the",
-                    "recieve" to "receive",
-                    "seperate" to "separate",
-                    "untill" to "until",
-                    "definately" to "definitely",
-                    "occured" to "occurred",
-                    "accomodate" to "accommodate",
-                    "writting" to "writing",
-                    "realy" to "really",
-                    "becuase" to "because"
-                )
-                commonFixes[lastWord]?.let { fix ->
-                    results.add(LintItem(0, lastWord.length, lastWord, "Spelling correction", listOf(fix)))
-                }
-            }
+            Log.w(TAG, "Native Harper engine is unavailable; grammar suggestions disabled")
         }
 
         return results

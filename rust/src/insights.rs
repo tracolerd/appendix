@@ -1,5 +1,5 @@
-use std::collections::{HashMap, HashSet};
 use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WritingInsights {
@@ -51,7 +51,10 @@ impl InsightsEngine {
         let char_count = trimmed.chars().count();
 
         // Paragraphs
-        let paragraphs: Vec<&str> = trimmed.split("\n\n").filter(|p| !p.trim().is_empty()).collect();
+        let paragraphs: Vec<&str> = trimmed
+            .split("\n\n")
+            .filter(|p| !p.trim().is_empty())
+            .collect();
         let paragraph_count = paragraphs.len().max(1);
 
         // Sentences
@@ -106,7 +109,8 @@ impl InsightsEngine {
         let words_per_sentence = (word_count as f64) / (sentence_count as f64);
         let syllables_per_word = (total_syllables as f64) / (word_count as f64);
 
-        let mut flesch_reading_ease = 206.835 - (1.015 * words_per_sentence) - (84.6 * syllables_per_word);
+        let mut flesch_reading_ease =
+            206.835 - (1.015 * words_per_sentence) - (84.6 * syllables_per_word);
         if flesch_reading_ease < 0.0 {
             flesch_reading_ease = 0.0;
         } else if flesch_reading_ease > 100.0 {
@@ -114,7 +118,8 @@ impl InsightsEngine {
         }
 
         // Flesch-Kincaid Grade Level: 0.39 * (words/sentences) + 11.8 * (syllables/words) - 15.59
-        let mut flesch_kincaid_grade = (0.39 * words_per_sentence) + (11.8 * syllables_per_word) - 15.59;
+        let mut flesch_kincaid_grade =
+            (0.39 * words_per_sentence) + (11.8 * syllables_per_word) - 15.59;
         if flesch_kincaid_grade < 0.0 {
             flesch_kincaid_grade = 0.0;
         }

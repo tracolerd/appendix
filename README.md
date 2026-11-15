@@ -12,6 +12,37 @@ Every keystroke, grammar check, readability score, and AI rephrase happens entir
 
 ---
 
+## 📥 Platform Artifacts & Installation Guides
+
+| Platform | Local Build Artifacts | Signing & Packaging Status | Installation Guide |
+|---|---|---|---|
+| **Android** | `appendix-android.apk` (APK), `appendix-android.aab` (AAB) | ⚠️ **Debug-signed validation package** (`CN=Android Debug`). Ready for developer sideloading; Google Play Store release **NOT VERIFIED** until signed with an official upload key. | [INSTALL_ANDROID.md](INSTALL_ANDROID.md) |
+| **Windows** | `appendix_core.dll` (MSVC x64 C-ABI DLL) | ⚠️ **Native DLL only**. Full portable desktop ZIP blocked on host workstation (requires Visual Studio Desktop C++ workload); packaged automatically via GitHub Actions `windows-latest`. | [INSTALL_WINDOWS.md](INSTALL_WINDOWS.md) |
+| **macOS** | Build scripts & CI workflows ready | ⏳ **Not built locally** (Host is Windows 11; requires macOS host or `macos-latest` CI runner). | [INSTALL_MACOS.md](INSTALL_MACOS.md) |
+| **iOS** | Native Swift extension & XCFramework script ready | ⏳ **Not built locally** (Requires macOS host with Xcode and Apple developer provisioning). | [INSTALL_IOS.md](INSTALL_IOS.md) |
+
+For third-party open-source component licenses and attribution, see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+For the exact source snapshot and uncommitted build provenance, see [SOURCE_SNAPSHOT_MANIFEST.json](SOURCE_SNAPSHOT_MANIFEST.json).
+
+---
+
+## 📊 Cross-Platform Support & Distribution Matrix
+
+| Dimension | Android | Windows | macOS | iOS |
+|---|---|---|---|---|
+| **Harper Core Grammar & Spell Engine** | ✅ Yes (JNI Native `.so`) | ✅ Yes (FFI Native DLL) | ✅ Yes (FFI Native dylib) | ✅ Yes (C-Bridging Header) |
+| **Readability & Writing Analytics** | ✅ Yes | ✅ Yes | ✅ Yes | ✅ Yes |
+| **Local Draft History (SQLite)** | ✅ Yes | ✅ Yes | ✅ Yes | ✅ Yes |
+| **12 Rewriting Styles (Heuristics)** | ✅ Yes | ✅ Yes | ✅ Yes | ✅ Yes |
+| **Local Neural AI (Qwen 2.5 0.5B GGUF)** | ✅ Yes (CPU / NEON) | ✅ Yes (CPU / AVX2) | ✅ Yes (Metal / Accelerate) | ⚠️ Companion App only (iOS RAM limit) |
+| **System-Wide Virtual Keyboard (IME)** | ✅ Native Kotlin IME | N/A (Desktop) | N/A (Desktop) | ✅ Native Swift Extension |
+| **Zero Internet Network Access** | 🔒 100% Offline (No `INTERNET`) | 🔒 100% Offline (0 Sockets) | 🔒 100% Offline (Sandbox) | 🔒 100% Offline (`RequestsOpenAccess=false`) |
+| **Local Release Packaging** | 🟢 **APK & AAB Built** | 🟡 **DLL Only (Runner Blocked)** | 🟠 **Not Built (Host Blocked)** | 🟠 **Not Built (Host Blocked)** |
+| **Production Signing Status** | ⚠️ Debug-Signed (`CN=Android Debug`) | ⚠️ Unsigned Open-Source DLL | ⚠️ Unsigned / Ad-hoc | ⚠️ Needs Team Provisioning |
+| **Distribution Readiness Verdict** | **PARTIALLY VERIFIED** (Sideload Only) | **PARTIALLY VERIFIED** (DLL Only) | **NOT VERIFIED** (CI Ready) | **NOT VERIFIED** (CI Ready) |
+
+---
+
 ## 🌟 Key Capabilities
 
 ### 1. Real-time Offline Grammar & Spell Checking

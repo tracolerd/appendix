@@ -1,13 +1,12 @@
-use appendix_core::ai_engine::{
-    AiEngine, KNOWN_QWEN_05B_SHA256, KNOWN_TOKENIZER_SHA256,
-};
+use appendix_core::ai_engine::{AiEngine, KNOWN_QWEN_05B_SHA256, KNOWN_TOKENIZER_SHA256};
 use appendix_core::ai_rephrase::RewriteMode;
 
 const MODEL_PATH: &str = r"..\models\qwen2.5-0.5b-instruct-q4_k_m.gguf";
 const TOKENIZER_PATH: &str = r"..\models\tokenizer.json";
 
 fn check_model_exists() -> bool {
-    if !std::path::Path::new(MODEL_PATH).exists() || !std::path::Path::new(TOKENIZER_PATH).exists() {
+    if !std::path::Path::new(MODEL_PATH).exists() || !std::path::Path::new(TOKENIZER_PATH).exists()
+    {
         eprintln!(
             "SKIPPED: Model files not found at {} or {}. Place files in models/ to run neural tests.",
             MODEL_PATH, TOKENIZER_PATH
@@ -30,8 +29,14 @@ fn test_01_model_loading_integrity_and_lifecycle() {
         .expect("Failed to load Qwen 2.5 0.5B GGUF model with SHA-256 verification");
 
     assert!(status.loaded, "Model status should report loaded=true");
-    assert!(AiEngine::is_loaded(), "AiEngine::is_loaded() should be true");
-    assert!(status.file_size_mb > 400.0, "Model file size should be > 400 MB");
+    assert!(
+        AiEngine::is_loaded(),
+        "AiEngine::is_loaded() should be true"
+    );
+    assert!(
+        status.file_size_mb > 400.0,
+        "Model file size should be > 400 MB"
+    );
 
     println!("Loaded Model Name     : {}", status.model_name);
     println!("GGUF File Size        : {:.1} MB", status.file_size_mb);
@@ -53,7 +58,10 @@ fn test_01_model_loading_integrity_and_lifecycle() {
     // 2. Standalone SHA-256 Checksum Verification
     let model_valid = AiEngine::verify_file_checksum(MODEL_PATH, KNOWN_QWEN_05B_SHA256)
         .expect("SHA-256 verification failed on model");
-    assert!(model_valid, "GGUF model checksum must match official Qwen 2.5 hash");
+    assert!(
+        model_valid,
+        "GGUF model checksum must match official Qwen 2.5 hash"
+    );
 
     let tok_valid = AiEngine::verify_file_checksum(TOKENIZER_PATH, KNOWN_TOKENIZER_SHA256)
         .expect("SHA-256 verification failed on tokenizer");
@@ -62,7 +70,10 @@ fn test_01_model_loading_integrity_and_lifecycle() {
     // 3. Test corrupted / invalid hash rejection
     let fake_hash = "0000000000000000000000000000000000000000000000000000000000000000";
     let fake_valid = AiEngine::verify_file_checksum(MODEL_PATH, fake_hash).unwrap();
-    assert!(!fake_valid, "Checksum verification must reject invalid hash");
+    assert!(
+        !fake_valid,
+        "Checksum verification must reject invalid hash"
+    );
 
     // 4. Test Unload & Memory Reclamation
     AiEngine::unload_model().expect("Failed to unload model");
@@ -72,8 +83,7 @@ fn test_01_model_loading_integrity_and_lifecycle() {
     println!("Model successfully unloaded. Active memory reclaimed.");
 
     // 5. Reload for remaining test suites
-    AiEngine::load_model(MODEL_PATH, TOKENIZER_PATH, false)
-        .expect("Failed to reload model");
+    AiEngine::load_model(MODEL_PATH, TOKENIZER_PATH, false).expect("Failed to reload model");
     assert!(AiEngine::is_loaded());
 }
 
@@ -110,8 +120,18 @@ fn test_02_all_12_rewriting_modes() {
         let result = AiEngine::rewrite(input_text, *mode, Some(75));
 
         println!("------------------------------------------------------------");
-        let exp_tag = if mode.is_experimental() { " [Experimental]" } else { "" };
-        println!("[Mode {:02}/12] {}{} ({})", idx + 1, mode.title(), exp_tag, result.engine);
+        let exp_tag = if mode.is_experimental() {
+            " [Experimental]"
+        } else {
+            ""
+        };
+        println!(
+            "[Mode {:02}/12] {}{} ({})",
+            idx + 1,
+            mode.title(),
+            exp_tag,
+            result.engine
+        );
         println!("  Original: \"{}\"", result.original);
         println!("  Revised : \"{}\"", result.revised);
         if let Some(latency) = result.latency_ms {
@@ -125,8 +145,14 @@ fn test_02_all_12_rewriting_modes() {
             );
         }
 
-        assert_eq!(result.status, "success", "Inference status should be success");
-        assert!(!result.revised.trim().is_empty(), "Revised text must not be empty");
+        assert_eq!(
+            result.status, "success",
+            "Inference status should be success"
+        );
+        assert!(
+            !result.revised.trim().is_empty(),
+            "Revised text must not be empty"
+        );
         assert_ne!(
             result.revised.trim().to_lowercase(),
             result.original.trim().to_lowercase(),
@@ -262,12 +288,26 @@ fn test_04_benchmark_and_latency_profiling() {
     println!("\n================ DETAILED BENCHMARK PROFILE ================");
     println!("Total Sentences Processed : {}", sentences.len());
     println!("Total Tokens Generated    : {}", total_tokens);
-    println!("Cold Inference Latency    : {:.1} ms ({:.2} s)", cold_latency, cold_latency / 1000.0);
-    println!("Avg Warm Inference Latency: {:.1} ms ({:.2} s)", avg_warm_latency, avg_warm_latency / 1000.0);
+    println!(
+        "Cold Inference Latency    : {:.1} ms ({:.2} s)",
+        cold_latency,
+        cold_latency / 1000.0
+    );
+    println!(
+        "Avg Warm Inference Latency: {:.1} ms ({:.2} s)",
+        avg_warm_latency,
+        avg_warm_latency / 1000.0
+    );
     println!("Average Generation Speed  : {:.2} tokens/sec", avg_speed);
     if status.ram_measured {
-        println!("Process Working Set RAM   : {:.1} MB", status.ram_working_set_mb.unwrap_or(0.0));
-        println!("Process Peak Working Set  : {:.1} MB", status.ram_peak_mb.unwrap_or(0.0));
+        println!(
+            "Process Working Set RAM   : {:.1} MB",
+            status.ram_working_set_mb.unwrap_or(0.0)
+        );
+        println!(
+            "Process Peak Working Set  : {:.1} MB",
+            status.ram_peak_mb.unwrap_or(0.0)
+        );
     }
     println!("============================================================");
 }
@@ -287,16 +327,25 @@ fn test_05_cancellation_and_error_handling() {
         Some(100),
     );
     println!("Cancellation Test Status : {}", res_cancelled.status);
-    println!("Error Message            : {:?}", res_cancelled.error_message);
+    println!(
+        "Error Message            : {:?}",
+        res_cancelled.error_message
+    );
     assert_eq!(res_cancelled.status, "cancelled");
 
     // Test B: Model Unloaded Handling (No Heuristic Masking)
     AiEngine::unload_model().unwrap();
     let res_unloaded = AiEngine::rewrite("Any input sentence", RewriteMode::MakeProfessional, None);
     println!("Unloaded Test Status     : {}", res_unloaded.status);
-    println!("Error Message            : {:?}", res_unloaded.error_message);
+    println!(
+        "Error Message            : {:?}",
+        res_unloaded.error_message
+    );
     assert_eq!(res_unloaded.status, "model_not_loaded");
-    assert!(res_unloaded.revised.is_empty(), "Revised must be empty on error, not fake heuristic");
+    assert!(
+        res_unloaded.revised.is_empty(),
+        "Revised must be empty on error, not fake heuristic"
+    );
     assert_eq!(res_unloaded.engine, "None");
 
     // Reload for safety

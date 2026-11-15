@@ -77,6 +77,7 @@ void main() {
 
     // Tap British English
     final ukOption = find.text('British English (UK)');
+    await tester.ensureVisible(ukOption);
     await tester.tap(ukOption);
     await tester.pumpAndSettle();
 

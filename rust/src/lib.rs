@@ -446,8 +446,30 @@ mod tests {
     }
 
     #[test]
+    fn test_c_abi_engine_lifecycle_and_linting() {
+        // 1. Create engine via C ABI with American English
+        let engine_ptr = appendix_engine_new(0);
+        assert!(!engine_ptr.is_null(), "Engine pointer must not be null");
+
+        // 2. Check text with known typo
+        let text = CString::new("This is an test sentence with recieve typo.").unwrap();
+        let lint_ptr = appendix_engine_check(engine_ptr, text.as_ptr());
+        assert!(!lint_ptr.is_null(), "Lint result must not be null");
+        let lint_json = unsafe { CStr::from_ptr(lint_ptr).to_str().unwrap() };
+        assert!(lint_json.contains("start"), "Must produce JSON lints");
+        appendix_string_free(lint_ptr);
+
+        // 3. Switch dialect to British English
+        appendix_engine_set_dialect(engine_ptr, 1);
+
+        // 4. Clean free
+        appendix_engine_free(engine_ptr);
+    }
+
+    #[test]
     fn test_c_abi_insights_and_rewrite() {
-        let sample = CString::new("In order to achieve great results, we must practice daily.").unwrap();
+        let sample =
+            CString::new("In order to achieve great results, we must practice daily.").unwrap();
         let insights_ptr = appendix_insights_analyze(sample.as_ptr());
         assert!(!insights_ptr.is_null());
         let insights_json = unsafe { CStr::from_ptr(insights_ptr).to_str().unwrap() };

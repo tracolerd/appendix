@@ -30,8 +30,8 @@ public final class KeyboardViewController: UIInputViewController {
     private var letterButtons: [UIButton] = []
     private var shiftButton: UIButton?
 
-    // Shared App Group Preferences
-    private let appGroupDefaults = UserDefaults(suiteName: "group.org.appendix.appendix")
+    // Private local preferences (isolated to keyboard extension sandbox, no App Group sharing)
+    private var localDialect: Int32 = 0
 
     public override func viewDidLoad() {
         super.viewDidLoad()
@@ -46,8 +46,17 @@ public final class KeyboardViewController: UIInputViewController {
     }
 
     private func loadDialectPreference() {
-        let dialect = Int32(appGroupDefaults?.integer(forKey: "dialect") ?? 0)
-        NativeHarperBridge.shared.setDialect(dialect: dialect)
+        // Defaults to US English (0); isolated to keyboard extension's own standard container
+        localDialect = Int32(UserDefaults.standard.integer(forKey: "appendix_keyboard_dialect"))
+        NativeHarperBridge.shared.setDialect(dialect: localDialect)
+    }
+
+    private func toggleDialect() {
+        localDialect = (localDialect == 0) ? 1 : 0
+        UserDefaults.standard.set(Int(localDialect), forKey: "appendix_keyboard_dialect")
+        NativeHarperBridge.shared.setDialect(dialect: localDialect)
+        showDefaultCandidateStatus()
+        triggerGrammarCheck(delay: 0.1)
     }
 
     // ==========================================
@@ -108,11 +117,15 @@ public final class KeyboardViewController: UIInputViewController {
     private func showDefaultCandidateStatus() {
         candidateStackView.arrangedSubviews.forEach { $0.removeFromSuperview() }
 
-        let label = UILabel()
-        label.text = "Appendix 🛡️ Offline"
-        label.textColor = UIColor(red: 0.55, green: 0.60, blue: 0.68, alpha: 1.0)
-        label.font = UIFont.systemFont(ofSize: 13, weight: .semibold)
-        candidateStackView.addArrangedSubview(label)
+        let dialectLabel = (localDialect == 1) ? "EN-GB" : "EN-US"
+        let button = UIButton(type: .system)
+        button.setTitle("Appendix 🛡️ Offline (\(dialectLabel))", for: .normal)
+        button.setTitleColor(UIColor(red: 0.55, green: 0.60, blue: 0.68, alpha: 1.0), for: .normal)
+        button.titleLabel?.font = UIFont.systemFont(ofSize: 13, weight: .semibold)
+        button.addAction(UIAction { [weak self] _ in
+            self?.toggleDialect()
+        }, for: .touchUpInside)
+        candidateStackView.addArrangedSubview(button)
     }
 
     private func displaySuggestions(_ lints: [LintSuggestion]) {
@@ -161,18 +174,78 @@ public final class KeyboardViewController: UIInputViewController {
     }
 
     // ==========================================
-    // GRAMMAR ANALYSIS
+    // SENSITIVE FIELD & PRIVACY PROTECTION
     // ==========================================
+
+    private var isSensitiveField: Bool {
+        guard let proxy = textDocumentProxy as? UITextDocumentProxy else { return false }
+        return proxy.isSecureTextEntry == true
+    }
+
+    private var isSpecializedField: Bool {
+        guard let proxy = textDocumentProxy as? UITextDocumentProxy else { return false }
+        if let keyboardType = proxy.keyboardType {
+            if keyboardType == .URL ||
+               keyboardType == .emailAddress ||
+               keyboardType == .webSearch ||
+               keyboardType == .numberPad ||
+               keyboardType == .phonePad ||
+               keyboardType == .asciiCapableNumberPad ||
+               keyboardType == .decimalPad {
+                return true
+            }
+        }
+        return false
+    }
+
+    private func showSensitiveFieldStatus() {
+        candidateStackView.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        let label = UILabel()
+        label.text = "Appendix 🔒 Password (Privacy Protected)"
+        label.textColor = UIColor(red: 0.55, green: 0.60, blue: 0.68, alpha: 1.0)
+        label.font = UIFont.systemFont(ofSize: 13, weight: .semibold)
+        candidateStackView.addArrangedSubview(label)
+    }
+
+    // ==========================================
+    // GRAMMAR ANALYSIS (Debounced & Anti-Stale)
+    // ==========================================
+
+    private var currentCheckRequestId: Int = 0
 
     private func triggerGrammarCheck(delay: TimeInterval = 0.25) {
         checkTimer?.invalidate()
         checkTimer = Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { [weak self] _ in
             guard let self = self else { return }
-            let context = self.textDocumentProxy.documentContextBeforeInput ?? ""
+
+            if self.isSensitiveField {
+                self.showSensitiveFieldStatus()
+                return
+            }
+
+            if self.isSpecializedField {
+                self.showDefaultCandidateStatus()
+                return
+            }
+
+            guard let context = self.textDocumentProxy.documentContextBeforeInput,
+                  !context.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                self.showDefaultCandidateStatus()
+                return
+            }
+
+            self.currentCheckRequestId += 1
+            let requestId = self.currentCheckRequestId
+
             DispatchQueue.global(qos: .userInitiated).async {
                 let suggestions = NativeHarperBridge.shared.checkText(context)
                 DispatchQueue.main.async {
-                    self.displaySuggestions(suggestions)
+                    if requestId == self.currentCheckRequestId {
+                        let currentContext = self.textDocumentProxy.documentContextBeforeInput ?? ""
+                        if currentContext == context {
+                            self.displaySuggestions(suggestions)
+                        }
+                    }
                 }
             }
         }

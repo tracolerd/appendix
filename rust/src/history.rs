@@ -15,7 +15,8 @@ pub struct HistoryStorage;
 
 impl HistoryStorage {
     fn open(db_path: &str) -> Result<Connection, String> {
-        let conn = Connection::open(db_path).map_err(|e| format!("Failed to open SQLite db: {}", e))?;
+        let conn =
+            Connection::open(db_path).map_err(|e| format!("Failed to open SQLite db: {}", e))?;
         conn.execute(
             "CREATE TABLE IF NOT EXISTS writing_history (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -103,7 +104,10 @@ mod tests {
     #[test]
     fn test_history_crud() {
         let temp_dir = std::env::temp_dir();
-        let db_file = temp_dir.join(format!("test_history_{}.db", Utc::now().timestamp_nanos_opt().unwrap_or(12345)));
+        let db_file = temp_dir.join(format!(
+            "test_history_{}.db",
+            Utc::now().timestamp_nanos_opt().unwrap_or(12345)
+        ));
         let db_path = db_file.to_str().unwrap();
 
         let id1 = HistoryStorage::save(db_path, "Draft one", 2, 85.0).unwrap();

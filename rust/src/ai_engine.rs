@@ -55,7 +55,11 @@ impl TokenOutputStream {
         self.tokens.push(token);
         let text = self.decode(&self.tokens[self.prev_index..])?;
         if text.len() > prev_text.len()
-            && text.chars().last().map(|c| !c.is_control()).unwrap_or(false)
+            && text
+                .chars()
+                .last()
+                .map(|c| !c.is_control())
+                .unwrap_or(false)
         {
             let text = text.split_at(prev_text.len());
             self.prev_index = self.current_index;
@@ -168,8 +172,13 @@ pub fn get_process_memory_mb() -> (Option<f64>, Option<f64>, bool) {
 pub fn compute_file_sha256(path: &Path) -> Result<String, String> {
     use std::io::Read;
 
-    let mut file = std::fs::File::open(path)
-        .map_err(|e| format!("Failed to open file for SHA-256 check {}: {}", path.display(), e))?;
+    let mut file = std::fs::File::open(path).map_err(|e| {
+        format!(
+            "Failed to open file for SHA-256 check {}: {}",
+            path.display(),
+            e
+        )
+    })?;
     let mut hasher = Sha256::new();
     let mut buffer = [0u8; 1024 * 1024]; // 1MB buffer
 
@@ -244,10 +253,7 @@ impl AiEngine {
 
         // Cryptographic integrity verification
         if verify_checksum {
-            let filename = m_path
-                .file_name()
-                .and_then(|f| f.to_str())
-                .unwrap_or("");
+            let filename = m_path.file_name().and_then(|f| f.to_str()).unwrap_or("");
             if filename.contains("qwen2.5-0.5b-instruct-q4_k_m") {
                 let computed_hash = compute_file_sha256(&m_path)?;
                 if !computed_hash.eq_ignore_ascii_case(KNOWN_QWEN_05B_SHA256) {
@@ -258,10 +264,7 @@ impl AiEngine {
                 }
             }
 
-            let tok_filename = t_path
-                .file_name()
-                .and_then(|f| f.to_str())
-                .unwrap_or("");
+            let tok_filename = t_path.file_name().and_then(|f| f.to_str()).unwrap_or("");
             if tok_filename == "tokenizer.json" {
                 let computed_tok_hash = compute_file_sha256(&t_path)?;
                 if !computed_tok_hash.eq_ignore_ascii_case(KNOWN_TOKENIZER_SHA256) {
@@ -279,8 +282,12 @@ impl AiEngine {
         let mut file = std::fs::File::open(&m_path)
             .map_err(|e| format!("Failed to open GGUF model file: {}", e))?;
 
-        let content = gguf_file::Content::read(&mut file)
-            .map_err(|e| format!("Failed to parse GGUF headers (file may be corrupted): {}", e))?;
+        let content = gguf_file::Content::read(&mut file).map_err(|e| {
+            format!(
+                "Failed to parse GGUF headers (file may be corrupted): {}",
+                e
+            )
+        })?;
 
         let device = Device::Cpu;
         let model = Qwen2::from_gguf(content, &mut file, &device)
@@ -591,27 +598,26 @@ impl AiEngine {
 
         // 1. Prefill / Prompt Processing Phase
         let start_prefill = Instant::now();
-        let input = match Tensor::new(tokens.as_slice(), &loaded.device)
-            .and_then(|t| t.unsqueeze(0))
-        {
-            Ok(tensor) => tensor,
-            Err(e) => {
-                return RewriteResult {
-                    original: text.to_string(),
-                    revised: String::new(),
-                    mode: mode.title().to_string(),
-                    engine: "None".to_string(),
-                    latency_ms: None,
-                    prompt_eval_ms: None,
-                    token_eval_ms: None,
-                    tokens_generated: None,
-                    tokens_per_sec: None,
-                    model_name: Some(loaded.model_name.clone()),
-                    status: "tensor_error".to_string(),
-                    error_message: Some(format!("Tensor creation error: {}", e)),
-                };
-            }
-        };
+        let input =
+            match Tensor::new(tokens.as_slice(), &loaded.device).and_then(|t| t.unsqueeze(0)) {
+                Ok(tensor) => tensor,
+                Err(e) => {
+                    return RewriteResult {
+                        original: text.to_string(),
+                        revised: String::new(),
+                        mode: mode.title().to_string(),
+                        engine: "None".to_string(),
+                        latency_ms: None,
+                        prompt_eval_ms: None,
+                        token_eval_ms: None,
+                        tokens_generated: None,
+                        tokens_per_sec: None,
+                        model_name: Some(loaded.model_name.clone()),
+                        status: "tensor_error".to_string(),
+                        error_message: Some(format!("Tensor creation error: {}", e)),
+                    };
+                }
+            };
 
         let logits = match model_lock.forward(&input, 0).and_then(|l| l.squeeze(0)) {
             Ok(logits) => logits,
@@ -676,12 +682,11 @@ impl AiEngine {
             if next_token == eos_token {
                 break;
             }
-            let input = match Tensor::new(&[next_token], &loaded.device)
-                .and_then(|t| t.unsqueeze(0))
-            {
-                Ok(t) => t,
-                Err(_) => break,
-            };
+            let input =
+                match Tensor::new(&[next_token], &loaded.device).and_then(|t| t.unsqueeze(0)) {
+                    Ok(t) => t,
+                    Err(_) => break,
+                };
 
             let logits = match model_lock
                 .forward(&input, tokens.len() + i)

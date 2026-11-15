@@ -300,7 +300,7 @@ class _AiPanelState extends State<AiPanel> {
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.cancel_outlined, color: textSecondary, size: 20),
+                      Icon(Icons.cancel_outlined, color: textSecondary, size: 20),
                       const SizedBox(width: 8),
                       Text(
                         'Inference was cancelled by user.',

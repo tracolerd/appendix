@@ -4,7 +4,6 @@ import UIKit
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
   private let channelName = "org.appendix.appendix/ime"
-  private let appGroupSuite = "group.org.appendix.appendix"
   private let keyDialect = "dialect"
 
   override func application(
@@ -23,15 +22,17 @@ import UIKit
 
     channel.setMethodCallHandler { [weak self] (call: FlutterMethodCall, result: @escaping FlutterResult) in
       guard let self = self else { return }
-      let defaults = UserDefaults(suiteName: self.appGroupSuite)
+      let defaults = UserDefaults.standard
 
       switch call.method {
       case "isImeEnabled":
-        // iOS sandboxing prevents querying system-wide active third-party keyboards directly.
-        // We report whether the user has interacted with the extension or configured it.
-        result(defaults?.bool(forKey: "keyboard_activated") ?? true)
+        // Apple iOS security sandboxing prevents containing apps from querying
+        // whether custom keyboards are enabled in Settings > General > Keyboard.
+        // We report false so the UI directs the user to the iOS Settings guide.
+        result(false)
       case "isImeSelected":
-        result(true)
+        // iOS does not reveal the currently active keyboard to container apps.
+        result(false)
       case "openImeSettings":
         if let settingsUrl = URL(string: UIApplication.openSettingsURLString),
            UIApplication.shared.canOpenURL(settingsUrl) {
@@ -45,13 +46,13 @@ import UIKit
       case "setDialect":
         if let args = call.arguments as? [String: Any],
            let dialect = args["dialect"] as? Int {
-          defaults?.set(dialect, forKey: self.keyDialect)
+          defaults.set(dialect, forKey: self.keyDialect)
           result(true)
         } else {
           result(false)
         }
       case "getDialect":
-        let dialect = defaults?.integer(forKey: self.keyDialect) ?? 0
+        let dialect = defaults.integer(forKey: self.keyDialect)
         result(dialect)
       default:
         result(FlutterMethodNotImplemented)

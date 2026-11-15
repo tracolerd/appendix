@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [ main ]
 
+permissions:
+  contents: read
+
 jobs:
   rust-core:
     name: Rust Core Tests & Analysis
@@ -23,6 +26,10 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: rust
+
+      - name: Run Cargo Format Check
+        working-directory: rust
+        run: cargo fmt --all -- --check
 
       - name: Run Cargo Tests (Unit & Integration)
         working-directory: rust
@@ -107,7 +114,27 @@ jobs:
         with:
           targets: aarch64-apple-darwin, x86_64-apple-darwin, aarch64-apple-ios, aarch64-apple-ios-sim, x86_64-apple-ios
 
-      - name: Build Apple Platforms
+      - name: Build Apple Platforms (Universal Dylib & XCFramework)
         run: |
           chmod +x scripts/build_apple.sh
           ./scripts/build_apple.sh
+
+      - name: Setup Flutter for iOS Build
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.50.0'
+          channel: 'stable'
+          cache: true
+
+      - name: Install Dependencies
+        working-directory: app
+        run: flutter pub get
+
+      - name: Build iOS App & Embedded Keyboard Extension (Simulator)
+        run: |
+          xcodebuild -workspace app/ios/Runner.xcworkspace \
+            -scheme Runner \
+            -sdk iphonesimulator \
+            -configuration Debug \
+            CODE_SIGNING_ALLOWED=NO \
+            build
