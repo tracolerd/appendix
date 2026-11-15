@@ -29,9 +29,17 @@ typedef _AiRewriteDart = ffi.Pointer<Utf8> Function(
     ffi.Pointer<Utf8> text, int mode);
 
 typedef _AiLoadModelC = ffi.Pointer<Utf8> Function(
-    ffi.Pointer<Utf8> modelPath, ffi.Pointer<Utf8> tokenizerPath);
+    ffi.Pointer<Utf8> modelPath, ffi.Pointer<Utf8> tokenizerPath, ffi.Int32 verifyChecksum);
 typedef _AiLoadModelDart = ffi.Pointer<Utf8> Function(
-    ffi.Pointer<Utf8> modelPath, ffi.Pointer<Utf8> tokenizerPath);
+    ffi.Pointer<Utf8> modelPath, ffi.Pointer<Utf8> tokenizerPath, int verifyChecksum);
+
+typedef _AiCancelC = ffi.Void Function();
+typedef _AiCancelDart = void Function();
+
+typedef _AiVerifyModelC = ffi.Pointer<Utf8> Function(
+    ffi.Pointer<Utf8> filePath, ffi.Pointer<Utf8> expectedSha256);
+typedef _AiVerifyModelDart = ffi.Pointer<Utf8> Function(
+    ffi.Pointer<Utf8> filePath, ffi.Pointer<Utf8> expectedSha256);
 
 typedef _AiUnloadModelC = ffi.Int32 Function();
 typedef _AiUnloadModelDart = int Function();
@@ -78,6 +86,8 @@ class NativeGrammarEngine {
   _AiLoadModelDart? _aiLoadModel;
   _AiUnloadModelDart? _aiUnloadModel;
   _AiStatusDart? _aiStatus;
+  _AiCancelDart? _aiCancel;
+  _AiVerifyModelDart? _aiVerifyModel;
   _HistorySaveDart? _historySave;
   _HistoryListDart? _historyList;
   _HistoryDeleteDart? _historyDelete;
@@ -111,6 +121,8 @@ class NativeGrammarEngine {
           _aiLoadModel = _dylib!.lookupFunction<_AiLoadModelC, _AiLoadModelDart>('appendix_ai_load_model');
           _aiUnloadModel = _dylib!.lookupFunction<_AiUnloadModelC, _AiUnloadModelDart>('appendix_ai_unload_model');
           _aiStatus = _dylib!.lookupFunction<_AiStatusC, _AiStatusDart>('appendix_ai_status');
+          _aiCancel = _dylib!.lookupFunction<_AiCancelC, _AiCancelDart>('appendix_ai_cancel');
+          _aiVerifyModel = _dylib!.lookupFunction<_AiVerifyModelC, _AiVerifyModelDart>('appendix_ai_verify_model');
         } catch (_) {}
         _historySave = _dylib!.lookupFunction<_HistorySaveC,
             _HistorySaveDart>('appendix_history_save');
@@ -134,13 +146,14 @@ class NativeGrammarEngine {
 
   static ffi.DynamicLibrary? _loadLibrary() {
     if (Platform.isWindows) {
+      final exeDir = File(Platform.resolvedExecutable).parent.path;
       final candidatePaths = [
         'appendix_core.dll',
+        '$exeDir/appendix_core.dll',
+        '$exeDir/data/appendix_core.dll',
+        'windows/appendix_core.dll',
         '../rust/target/release/appendix_core.dll',
         '../rust/target/debug/appendix_core.dll',
-        'C:/AA. Disks/Workstation/Project Typing App/rust/target/release/appendix_core.dll',
-        'C:/AA. Disks/Workstation/Project Typing App/rust/target/debug/appendix_core.dll',
-        'C:/AA. Disks/Workstation/Project Typing App/app/appendix_core.dll',
       ];
 
       for (final p in candidatePaths) {
@@ -266,13 +279,13 @@ class NativeGrammarEngine {
     return _fallbackRewrite(text, mode);
   }
 
-  /// Load a local GGUF AI model into memory
-  AiModelStatus loadAiModel(String modelPath, String tokenizerPath) {
+  /// Load a local GGUF AI model into memory with optional SHA-256 verification
+  AiModelStatus loadAiModel(String modelPath, String tokenizerPath, {bool verifyChecksum = false}) {
     if (_isInitialized && _aiLoadModel != null && _stringFree != null) {
       final nativeModel = modelPath.toNativeUtf8();
       final nativeTokenizer = tokenizerPath.toNativeUtf8();
       try {
-        final resultPtr = _aiLoadModel!(nativeModel, nativeTokenizer);
+        final resultPtr = _aiLoadModel!(nativeModel, nativeTokenizer, verifyChecksum ? 1 : 0);
         if (resultPtr != ffi.nullptr) {
           try {
             final jsonStr = resultPtr.toDartString();
@@ -288,6 +301,52 @@ class NativeGrammarEngine {
       }
     }
     return const AiModelStatus(loaded: false);
+  }
+
+  /// Request immediate cancellation of in-flight inference
+  void cancelAi() {
+    if (_isInitialized && _aiCancel != null) {
+      try {
+        _aiCancel!();
+      } catch (_) {}
+    }
+  }
+
+  /// Cryptographically verify model or tokenizer SHA-256 hash
+  ModelVerificationResult verifyModel(String filePath, String expectedSha256) {
+    if (_isInitialized && _aiVerifyModel != null && _stringFree != null) {
+      final nativePath = filePath.toNativeUtf8();
+      final nativeHash = expectedSha256.toNativeUtf8();
+      try {
+        final resultPtr = _aiVerifyModel!(nativePath, nativeHash);
+        if (resultPtr != ffi.nullptr) {
+          try {
+            final jsonStr = resultPtr.toDartString();
+            return ModelVerificationResult.parse(jsonStr);
+          } finally {
+            _stringFree!(resultPtr);
+          }
+        }
+      } catch (e) {
+        return ModelVerificationResult(
+          success: false,
+          valid: false,
+          computedSha256: '',
+          expectedSha256: expectedSha256,
+          error: e.toString(),
+        );
+      } finally {
+        calloc.free(nativePath);
+        calloc.free(nativeHash);
+      }
+    }
+    return ModelVerificationResult(
+      success: false,
+      valid: false,
+      computedSha256: '',
+      expectedSha256: expectedSha256,
+      error: 'Native library not initialized',
+    );
   }
 
   /// Unload AI model from memory to reclaim RAM

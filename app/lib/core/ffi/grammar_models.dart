@@ -176,14 +176,18 @@ enum RewriteMode {
   improveClarity(7, 'Improve Clarity', 'Untangles awkward and convoluted clauses'),
   improveVocabulary(8, 'Elevate Vocabulary', 'Upgrades repetitive and simple words'),
   simplify(9, 'Simplify', 'Plain language that anyone can easily read'),
-  activeToPassive(10, 'Active to Passive', 'Converts into passive grammatical voice'),
-  passiveToActive(11, 'Passive to Active', 'Converts into direct, active voice');
+  activeToPassive(10, 'Active to Passive (Experimental)', 'Converts into passive grammatical voice'),
+  passiveToActive(11, 'Passive to Active (Experimental)', 'Converts into direct, active voice');
 
   final int ffiValue;
   final String title;
   final String description;
 
   const RewriteMode(this.ffiValue, this.title, this.description);
+
+  bool get isExperimental =>
+      this == RewriteMode.activeToPassive ||
+      this == RewriteMode.passiveToActive;
 }
 
 /// Output of an AI rewrite operation
@@ -193,6 +197,8 @@ class RewriteResult {
   final String mode;
   final String engine;
   final double? latencyMs;
+  final double? promptEvalMs;
+  final double? tokenEvalMs;
   final int? tokensGenerated;
   final double? tokensPerSec;
   final String? modelName;
@@ -205,6 +211,8 @@ class RewriteResult {
     required this.mode,
     required this.engine,
     this.latencyMs,
+    this.promptEvalMs,
+    this.tokenEvalMs,
     this.tokensGenerated,
     this.tokensPerSec,
     this.modelName,
@@ -219,6 +227,8 @@ class RewriteResult {
       mode: json['mode'] as String? ?? 'Rephrase',
       engine: json['engine'] as String? ?? 'Offline',
       latencyMs: (json['latency_ms'] as num?)?.toDouble(),
+      promptEvalMs: (json['prompt_eval_ms'] as num?)?.toDouble(),
+      tokenEvalMs: (json['token_eval_ms'] as num?)?.toDouble(),
       tokensGenerated: (json['tokens_generated'] as num?)?.toInt(),
       tokensPerSec: (json['tokens_per_sec'] as num?)?.toDouble(),
       modelName: json['model_name'] as String?,
@@ -247,6 +257,10 @@ class AiModelStatus {
   final String modelPath;
   final String tokenizerPath;
   final double modelSizeMb;
+  final double fileSizeMb;
+  final double? ramWorkingSetMb;
+  final double? ramPeakMb;
+  final bool ramMeasured;
   final String engine;
   final int uptimeSeconds;
 
@@ -256,17 +270,26 @@ class AiModelStatus {
     this.modelPath = '',
     this.tokenizerPath = '',
     this.modelSizeMb = 0.0,
+    this.fileSizeMb = 0.0,
+    this.ramWorkingSetMb,
+    this.ramPeakMb,
+    this.ramMeasured = false,
     this.engine = 'None',
     this.uptimeSeconds = 0,
   });
 
   factory AiModelStatus.fromJson(Map<String, dynamic> json) {
+    final fSize = (json['file_size_mb'] ?? json['model_size_mb'] as num?)?.toDouble() ?? 0.0;
     return AiModelStatus(
       loaded: json['loaded'] as bool? ?? false,
       modelName: json['model_name'] as String? ?? '',
       modelPath: json['model_path'] as String? ?? '',
       tokenizerPath: json['tokenizer_path'] as String? ?? '',
-      modelSizeMb: (json['model_size_mb'] as num?)?.toDouble() ?? 0.0,
+      modelSizeMb: fSize,
+      fileSizeMb: fSize,
+      ramWorkingSetMb: (json['ram_working_set_mb'] as num?)?.toDouble(),
+      ramPeakMb: (json['ram_peak_mb'] as num?)?.toDouble(),
+      ramMeasured: json['ram_measured'] as bool? ?? false,
       engine: json['engine'] as String? ?? 'None',
       uptimeSeconds: (json['uptime_seconds'] as num?)?.toInt() ?? 0,
     );
@@ -281,6 +304,56 @@ class AiModelStatus {
       return AiModelStatus.fromJson(decoded);
     } catch (_) {
       return const AiModelStatus(loaded: false);
+    }
+  }
+}
+
+/// Result of cryptographic SHA-256 verification
+class ModelVerificationResult {
+  final bool success;
+  final bool valid;
+  final String computedSha256;
+  final String expectedSha256;
+  final String? error;
+
+  const ModelVerificationResult({
+    required this.success,
+    required this.valid,
+    required this.computedSha256,
+    required this.expectedSha256,
+    this.error,
+  });
+
+  factory ModelVerificationResult.fromJson(Map<String, dynamic> json) {
+    return ModelVerificationResult(
+      success: json['success'] as bool? ?? false,
+      valid: json['valid'] as bool? ?? false,
+      computedSha256: json['computed_sha256'] as String? ?? '',
+      expectedSha256: json['expected_sha256'] as String? ?? '',
+      error: json['error'] as String?,
+    );
+  }
+
+  static ModelVerificationResult parse(String jsonString) {
+    if (jsonString.trim().isEmpty) {
+      return const ModelVerificationResult(
+        success: false,
+        valid: false,
+        computedSha256: '',
+        expectedSha256: '',
+      );
+    }
+    try {
+      final decoded = jsonDecode(jsonString) as Map<String, dynamic>;
+      return ModelVerificationResult.fromJson(decoded);
+    } catch (e) {
+      return ModelVerificationResult(
+        success: false,
+        valid: false,
+        computedSha256: '',
+        expectedSha256: '',
+        error: e.toString(),
+      );
     }
   }
 }

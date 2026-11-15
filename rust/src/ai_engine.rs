@@ -1,4 +1,5 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, RwLock};
 use std::time::Instant;
 
@@ -8,9 +9,18 @@ use candle_transformers::generation::{LogitsProcessor, Sampling};
 use candle_transformers::models::quantized_qwen2::ModelWeights as Qwen2;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use tokenizers::Tokenizer;
 
 use crate::ai_rephrase::{RewriteMode, RewriteResult};
+
+pub const KNOWN_QWEN_05B_SHA256: &str =
+    "74a4da8c9fdbcd15bd1f6d01d621410d31c6fc00986f5eb687824e7b93d7a9db";
+pub const KNOWN_TOKENIZER_SHA256: &str =
+    "c0382117ea329cdf097041132f6d735924b697924d6f6fc3945713e96ce87539";
+
+static CANCEL_REQUESTED: AtomicBool = AtomicBool::new(false);
+static AUTO_LOAD_ALLOWED: AtomicBool = AtomicBool::new(true);
 
 pub struct TokenOutputStream {
     tokenizer: Tokenizer,
@@ -30,7 +40,9 @@ impl TokenOutputStream {
     }
 
     fn decode(&self, tokens: &[u32]) -> anyhow::Result<String> {
-        self.tokenizer.decode(tokens, true).map_err(|e| anyhow::anyhow!("{e}"))
+        self.tokenizer
+            .decode(tokens, true)
+            .map_err(|e| anyhow::anyhow!("{e}"))
     }
 
     pub fn next_token(&mut self, token: u32) -> anyhow::Result<Option<String>> {
@@ -42,7 +54,9 @@ impl TokenOutputStream {
         };
         self.tokens.push(token);
         let text = self.decode(&self.tokens[self.prev_index..])?;
-        if text.len() > prev_text.len() && text.chars().last().map(|c| !c.is_control()).unwrap_or(false) {
+        if text.len() > prev_text.len()
+            && text.chars().last().map(|c| !c.is_control()).unwrap_or(false)
+        {
             let text = text.split_at(prev_text.len());
             self.prev_index = self.current_index;
             self.current_index = self.tokens.len();
@@ -97,17 +111,105 @@ pub struct ModelStatus {
     pub model_path: String,
     pub tokenizer_path: String,
     pub model_size_mb: f64,
+    pub file_size_mb: f64,
+    pub ram_working_set_mb: Option<f64>,
+    pub ram_peak_mb: Option<f64>,
+    pub ram_measured: bool,
     pub engine: String,
     pub uptime_seconds: u64,
 }
 
 static MODEL_HOLDER: Lazy<RwLock<Option<LoadedModel>>> = Lazy::new(|| RwLock::new(None));
 
+/// Query Windows OS kernel for actual process working set and peak RAM consumption.
+#[cfg(target_os = "windows")]
+pub fn get_process_memory_mb() -> (Option<f64>, Option<f64>, bool) {
+    #[repr(C)]
+    #[allow(non_snake_case)]
+    struct PROCESS_MEMORY_COUNTERS {
+        cb: u32,
+        PageFaultCount: u32,
+        PeakWorkingSetSize: usize,
+        WorkingSetSize: usize,
+        QuotaPeakPagedPoolUsage: usize,
+        QuotaPagedPoolUsage: usize,
+        QuotaPeakNonPagedPoolUsage: usize,
+        QuotaNonPagedPoolUsage: usize,
+        PagefileUsage: usize,
+        PeakPagefileUsage: usize,
+    }
+    extern "system" {
+        fn GetCurrentProcess() -> isize;
+        fn K32GetProcessMemoryInfo(
+            hProcess: isize,
+            ppsmemCounters: *mut PROCESS_MEMORY_COUNTERS,
+            cb: u32,
+        ) -> i32;
+    }
+    unsafe {
+        let mut pmc: PROCESS_MEMORY_COUNTERS = std::mem::zeroed();
+        pmc.cb = std::mem::size_of::<PROCESS_MEMORY_COUNTERS>() as u32;
+        if K32GetProcessMemoryInfo(GetCurrentProcess(), &mut pmc, pmc.cb) != 0 {
+            let ws_mb = pmc.WorkingSetSize as f64 / (1024.0 * 1024.0);
+            let peak_mb = pmc.PeakWorkingSetSize as f64 / (1024.0 * 1024.0);
+            (Some(ws_mb), Some(peak_mb), true)
+        } else {
+            (None, None, false)
+        }
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+pub fn get_process_memory_mb() -> (Option<f64>, Option<f64>, bool) {
+    (None, None, false)
+}
+
+/// Compute cryptographic SHA-256 hash using streaming buffer (memory efficient).
+pub fn compute_file_sha256(path: &Path) -> Result<String, String> {
+    use std::io::Read;
+
+    let mut file = std::fs::File::open(path)
+        .map_err(|e| format!("Failed to open file for SHA-256 check {}: {}", path.display(), e))?;
+    let mut hasher = Sha256::new();
+    let mut buffer = [0u8; 1024 * 1024]; // 1MB buffer
+
+    loop {
+        let bytes_read = file
+            .read(&mut buffer)
+            .map_err(|e| format!("Read error during hashing {}: {}", path.display(), e))?;
+        if bytes_read == 0 {
+            break;
+        }
+        hasher.update(&buffer[..bytes_read]);
+    }
+
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
 pub struct AiEngine;
 
 impl AiEngine {
-    /// Load a GGUF model and tokenizer into memory.
-    pub fn load_model(model_path: &str, tokenizer_path: &str) -> Result<ModelStatus, String> {
+    /// Signal the inference loop to abort immediately at the next token boundary.
+    pub fn cancel_inference() {
+        CANCEL_REQUESTED.store(true, Ordering::SeqCst);
+    }
+
+    /// Verify a file's SHA-256 checksum against an expected hex string.
+    pub fn verify_file_checksum(file_path: &str, expected_sha256: &str) -> Result<bool, String> {
+        let path = PathBuf::from(file_path);
+        if !path.exists() {
+            return Err(format!("File does not exist: {}", file_path));
+        }
+        let computed = compute_file_sha256(&path)?;
+        Ok(computed.eq_ignore_ascii_case(expected_sha256.trim()))
+    }
+
+    /// Load a GGUF model and tokenizer into memory with optional cryptographic integrity check.
+    pub fn load_model(
+        model_path: &str,
+        tokenizer_path: &str,
+        verify_checksum: bool,
+    ) -> Result<ModelStatus, String> {
         let m_path = PathBuf::from(model_path);
         let t_path = PathBuf::from(tokenizer_path);
 
@@ -122,6 +224,55 @@ impl AiEngine {
             .map(|m| m.len() as usize)
             .unwrap_or(0);
 
+        if model_size_bytes == 0 {
+            return Err(format!(
+                "Corrupted model file: size is 0 bytes at {}",
+                model_path
+            ));
+        }
+
+        let tokenizer_size_bytes = std::fs::metadata(&t_path)
+            .map(|m| m.len() as usize)
+            .unwrap_or(0);
+
+        if tokenizer_size_bytes == 0 {
+            return Err(format!(
+                "Corrupted tokenizer file: size is 0 bytes at {}",
+                tokenizer_path
+            ));
+        }
+
+        // Cryptographic integrity verification
+        if verify_checksum {
+            let filename = m_path
+                .file_name()
+                .and_then(|f| f.to_str())
+                .unwrap_or("");
+            if filename.contains("qwen2.5-0.5b-instruct-q4_k_m") {
+                let computed_hash = compute_file_sha256(&m_path)?;
+                if !computed_hash.eq_ignore_ascii_case(KNOWN_QWEN_05B_SHA256) {
+                    return Err(format!(
+                        "Model integrity check failed! Expected SHA-256: {}, computed: {}",
+                        KNOWN_QWEN_05B_SHA256, computed_hash
+                    ));
+                }
+            }
+
+            let tok_filename = t_path
+                .file_name()
+                .and_then(|f| f.to_str())
+                .unwrap_or("");
+            if tok_filename == "tokenizer.json" {
+                let computed_tok_hash = compute_file_sha256(&t_path)?;
+                if !computed_tok_hash.eq_ignore_ascii_case(KNOWN_TOKENIZER_SHA256) {
+                    return Err(format!(
+                        "Tokenizer integrity check failed! Expected SHA-256: {}, computed: {}",
+                        KNOWN_TOKENIZER_SHA256, computed_tok_hash
+                    ));
+                }
+            }
+        }
+
         let tokenizer = Tokenizer::from_file(&t_path)
             .map_err(|e| format!("Failed to parse tokenizer: {}", e))?;
 
@@ -129,7 +280,7 @@ impl AiEngine {
             .map_err(|e| format!("Failed to open GGUF model file: {}", e))?;
 
         let content = gguf_file::Content::read(&mut file)
-            .map_err(|e| format!("Failed to parse GGUF headers: {}", e))?;
+            .map_err(|e| format!("Failed to parse GGUF headers (file may be corrupted): {}", e))?;
 
         let device = Device::Cpu;
         let model = Qwen2::from_gguf(content, &mut file, &device)
@@ -151,25 +302,38 @@ impl AiEngine {
             loaded_at: Instant::now(),
         };
 
+        let file_mb = model_size_bytes as f64 / (1024.0 * 1024.0);
+        let (ram_ws, ram_peak, measured) = get_process_memory_mb();
+
         let status = ModelStatus {
             loaded: true,
             model_name: filename,
             model_path: m_path.display().to_string(),
             tokenizer_path: t_path.display().to_string(),
-            model_size_mb: model_size_bytes as f64 / (1024.0 * 1024.0),
+            model_size_mb: file_mb,
+            file_size_mb: file_mb,
+            ram_working_set_mb: ram_ws,
+            ram_peak_mb: ram_peak,
+            ram_measured: measured,
             engine: "Qwen 2.5 Local Neural SLM (Candle Runtime)".to_string(),
             uptime_seconds: 0,
         };
 
-        let mut lock = MODEL_HOLDER.write().map_err(|e| format!("Lock error: {}", e))?;
+        let mut lock = MODEL_HOLDER
+            .write()
+            .map_err(|e| format!("Lock error: {}", e))?;
         *lock = Some(loaded);
+        AUTO_LOAD_ALLOWED.store(true, Ordering::SeqCst);
 
         Ok(status)
     }
 
     /// Unload model from memory and immediately reclaim RAM.
     pub fn unload_model() -> Result<(), String> {
-        let mut lock = MODEL_HOLDER.write().map_err(|e| format!("Lock error: {}", e))?;
+        AUTO_LOAD_ALLOWED.store(false, Ordering::SeqCst);
+        let mut lock = MODEL_HOLDER
+            .write()
+            .map_err(|e| format!("Lock error: {}", e))?;
         *lock = None;
         Ok(())
     }
@@ -183,16 +347,23 @@ impl AiEngine {
         }
     }
 
-    /// Get current model status.
+    /// Get current model status with live OS RAM working set statistics.
     pub fn get_status() -> ModelStatus {
+        let (ram_ws, ram_peak, measured) = get_process_memory_mb();
+
         if let Ok(lock) = MODEL_HOLDER.read() {
             if let Some(loaded) = lock.as_ref() {
+                let file_mb = loaded.model_size_bytes as f64 / (1024.0 * 1024.0);
                 return ModelStatus {
                     loaded: true,
                     model_name: loaded.model_name.clone(),
                     model_path: loaded.model_path.display().to_string(),
                     tokenizer_path: loaded.tokenizer_path.display().to_string(),
-                    model_size_mb: loaded.model_size_bytes as f64 / (1024.0 * 1024.0),
+                    model_size_mb: file_mb,
+                    file_size_mb: file_mb,
+                    ram_working_set_mb: ram_ws,
+                    ram_peak_mb: ram_peak,
+                    ram_measured: measured,
                     engine: "Qwen 2.5 Local Neural SLM (Candle Runtime)".to_string(),
                     uptime_seconds: loaded.loaded_at.elapsed().as_secs(),
                 };
@@ -205,12 +376,16 @@ impl AiEngine {
             model_path: String::new(),
             tokenizer_path: String::new(),
             model_size_mb: 0.0,
+            file_size_mb: 0.0,
+            ram_working_set_mb: ram_ws,
+            ram_peak_mb: ram_peak,
+            ram_measured: measured,
             engine: "None".to_string(),
             uptime_seconds: 0,
         }
     }
 
-    /// Automatically find local model files in well-known standard locations.
+    /// Automatically find local model files in well-known standard locations without hardcoded personal paths.
     pub fn find_default_model_paths() -> Option<(PathBuf, PathBuf)> {
         let candidate_names = [
             "qwen2.5-0.5b-instruct-q4_k_m.gguf",
@@ -219,17 +394,27 @@ impl AiEngine {
             "model.gguf",
         ];
 
-        let search_dirs = [
-            PathBuf::from("models"),
-            PathBuf::from(r"c:\AA. Disks\Workstation\Project Typing App\models"),
-            PathBuf::from("../models"),
-            PathBuf::from("../../models"),
-            PathBuf::from("../../../models"),
-            std::env::current_exe()
-                .ok()
-                .and_then(|p| p.parent().map(|d| d.join("models")))
-                .unwrap_or_else(|| PathBuf::from("models")),
-        ];
+        let mut search_dirs = Vec::new();
+
+        // 1. Environment variable if user/system configured
+        if let Ok(env_path) = std::env::var("APPENDIX_MODELS_DIR") {
+            search_dirs.push(PathBuf::from(env_path));
+        }
+
+        // 2. Relative models directory in current working dir
+        search_dirs.push(PathBuf::from("models"));
+
+        // 3. Parent models directories (e.g. running from rust/ or app/)
+        search_dirs.push(PathBuf::from("../models"));
+        search_dirs.push(PathBuf::from("../../models"));
+
+        // 4. Executable-adjacent models directory (packaged standalone desktop app)
+        if let Ok(exe_path) = std::env::current_exe() {
+            if let Some(exe_dir) = exe_path.parent() {
+                search_dirs.push(exe_dir.join("models"));
+                search_dirs.push(exe_dir.join("data").join("models"));
+            }
+        }
 
         for dir in &search_dirs {
             let tokenizer = dir.join("tokenizer.json");
@@ -256,6 +441,7 @@ impl AiEngine {
             if let Ok(_) = Self::load_model(
                 &model_path.to_string_lossy(),
                 &tokenizer_path.to_string_lossy(),
+                false, // Fast auto-load (explicit verify can be called on demand)
             ) {
                 return true;
             }
@@ -274,6 +460,8 @@ impl AiEngine {
                 mode: mode.title().to_string(),
                 engine: "Qwen 2.5 Local Neural SLM".to_string(),
                 latency_ms: Some(0.0),
+                prompt_eval_ms: Some(0.0),
+                token_eval_ms: Some(0.0),
                 tokens_generated: Some(0),
                 tokens_per_sec: Some(0.0),
                 model_name: None,
@@ -282,8 +470,8 @@ impl AiEngine {
             };
         }
 
-        // Try to auto-load if not already loaded
-        if !Self::is_loaded() {
+        // Try to auto-load if not already loaded and not explicitly unloaded
+        if !Self::is_loaded() && AUTO_LOAD_ALLOWED.load(Ordering::Relaxed) {
             Self::auto_load_if_available();
         }
 
@@ -292,10 +480,12 @@ impl AiEngine {
             Err(e) => {
                 return RewriteResult {
                     original: text.to_string(),
-                    revised: mode.heuristic_fallback(text),
+                    revised: String::new(),
                     mode: mode.title().to_string(),
-                    engine: "Heuristic Fallback".to_string(),
+                    engine: "None".to_string(),
                     latency_ms: None,
+                    prompt_eval_ms: None,
+                    token_eval_ms: None,
                     tokens_generated: None,
                     tokens_per_sec: None,
                     model_name: None,
@@ -310,16 +500,18 @@ impl AiEngine {
             None => {
                 return RewriteResult {
                     original: text.to_string(),
-                    revised: mode.heuristic_fallback(text),
+                    revised: String::new(),
                     mode: mode.title().to_string(),
-                    engine: "Heuristic Fallback".to_string(),
+                    engine: "None".to_string(),
                     latency_ms: None,
+                    prompt_eval_ms: None,
+                    token_eval_ms: None,
                     tokens_generated: None,
                     tokens_per_sec: None,
                     model_name: None,
-                    status: "model_not_found".to_string(),
+                    status: "model_not_loaded".to_string(),
                     error_message: Some(
-                        "Local AI model is not loaded. Place qwen2.5-0.5b-instruct-q4_k_m.gguf in models/ directory."
+                        "Local AI model is not loaded. Please download and load Qwen 2.5 0.5B GGUF first."
                             .to_string(),
                     ),
                 };
@@ -331,10 +523,12 @@ impl AiEngine {
             Err(e) => {
                 return RewriteResult {
                     original: text.to_string(),
-                    revised: mode.heuristic_fallback(text),
+                    revised: String::new(),
                     mode: mode.title().to_string(),
-                    engine: "Heuristic Fallback".to_string(),
+                    engine: "None".to_string(),
                     latency_ms: None,
+                    prompt_eval_ms: None,
+                    token_eval_ms: None,
                     tokens_generated: None,
                     tokens_per_sec: None,
                     model_name: Some(loaded.model_name.clone()),
@@ -344,6 +538,24 @@ impl AiEngine {
             }
         };
 
+        // Check if cancellation was already requested before starting inference
+        if CANCEL_REQUESTED.swap(false, Ordering::SeqCst) {
+            return RewriteResult {
+                original: text.to_string(),
+                revised: String::new(),
+                mode: mode.title().to_string(),
+                engine: "Qwen 2.5 0.5B Neural (Cancelled)".to_string(),
+                latency_ms: Some(0.0),
+                prompt_eval_ms: Some(0.0),
+                token_eval_ms: Some(0.0),
+                tokens_generated: Some(0),
+                tokens_per_sec: Some(0.0),
+                model_name: Some(loaded.model_name.clone()),
+                status: "cancelled".to_string(),
+                error_message: Some("Inference was cancelled by user".to_string()),
+            };
+        }
+
         let mut tos = TokenOutputStream::new(loaded.tokenizer.clone());
         let prompt_str = mode.format_chatml_prompt(trimmed_input);
 
@@ -352,10 +564,12 @@ impl AiEngine {
             Err(e) => {
                 return RewriteResult {
                     original: text.to_string(),
-                    revised: mode.heuristic_fallback(text),
+                    revised: String::new(),
                     mode: mode.title().to_string(),
-                    engine: "Heuristic Fallback".to_string(),
+                    engine: "None".to_string(),
                     latency_ms: None,
+                    prompt_eval_ms: None,
+                    token_eval_ms: None,
                     tokens_generated: None,
                     tokens_per_sec: None,
                     model_name: Some(loaded.model_name.clone()),
@@ -373,9 +587,10 @@ impl AiEngine {
             .unwrap_or(151645);
 
         let mut logits_processor = LogitsProcessor::from_sampling(42, Sampling::ArgMax);
-        let start_infer = Instant::now();
+        let start_total = Instant::now();
 
-        // Prefill / Prompt Processing
+        // 1. Prefill / Prompt Processing Phase
+        let start_prefill = Instant::now();
         let input = match Tensor::new(tokens.as_slice(), &loaded.device)
             .and_then(|t| t.unsqueeze(0))
         {
@@ -383,10 +598,12 @@ impl AiEngine {
             Err(e) => {
                 return RewriteResult {
                     original: text.to_string(),
-                    revised: mode.heuristic_fallback(text),
+                    revised: String::new(),
                     mode: mode.title().to_string(),
-                    engine: "Heuristic Fallback".to_string(),
+                    engine: "None".to_string(),
                     latency_ms: None,
+                    prompt_eval_ms: None,
+                    token_eval_ms: None,
                     tokens_generated: None,
                     tokens_per_sec: None,
                     model_name: Some(loaded.model_name.clone()),
@@ -401,10 +618,12 @@ impl AiEngine {
             Err(e) => {
                 return RewriteResult {
                     original: text.to_string(),
-                    revised: mode.heuristic_fallback(text),
+                    revised: String::new(),
                     mode: mode.title().to_string(),
-                    engine: "Heuristic Fallback".to_string(),
+                    engine: "None".to_string(),
                     latency_ms: None,
+                    prompt_eval_ms: None,
+                    token_eval_ms: None,
                     tokens_generated: None,
                     tokens_per_sec: None,
                     model_name: Some(loaded.model_name.clone()),
@@ -413,16 +632,21 @@ impl AiEngine {
                 };
             }
         };
+        let prompt_eval_ms = start_prefill.elapsed().as_secs_f64() * 1000.0;
 
+        // 2. Token Generation Phase
+        let start_generation = Instant::now();
         let mut next_token = match logits_processor.sample(&logits) {
             Ok(tok) => tok,
             Err(e) => {
                 return RewriteResult {
                     original: text.to_string(),
-                    revised: mode.heuristic_fallback(text),
+                    revised: String::new(),
                     mode: mode.title().to_string(),
-                    engine: "Heuristic Fallback".to_string(),
+                    engine: "None".to_string(),
                     latency_ms: None,
+                    prompt_eval_ms: Some(prompt_eval_ms),
+                    token_eval_ms: None,
                     tokens_generated: None,
                     tokens_per_sec: None,
                     model_name: Some(loaded.model_name.clone()),
@@ -439,7 +663,16 @@ impl AiEngine {
         }
 
         let token_limit = max_tokens.unwrap_or(80);
+        let mut was_cancelled = false;
+
         for i in 0..token_limit {
+            // Check cancellation request at each token boundary
+            if CANCEL_REQUESTED.load(Ordering::Relaxed) {
+                was_cancelled = true;
+                CANCEL_REQUESTED.store(false, Ordering::SeqCst);
+                break;
+            }
+
             if next_token == eos_token {
                 break;
             }
@@ -486,12 +719,13 @@ impl AiEngine {
             output_str.push_str(&rest);
         }
 
-        let total_time = start_infer.elapsed();
-        let total_sec = total_time.as_secs_f64();
-        let latency_ms = total_sec * 1000.0;
+        let token_eval_sec = start_generation.elapsed().as_secs_f64();
+        let token_eval_ms = token_eval_sec * 1000.0;
+        let total_latency_ms = start_total.elapsed().as_secs_f64() * 1000.0;
+
         let num_tokens = generated_tokens.len();
-        let tokens_per_sec = if total_sec > 0.0 {
-            num_tokens as f64 / total_sec
+        let tokens_per_sec = if token_eval_sec > 0.0 {
+            num_tokens as f64 / token_eval_sec
         } else {
             0.0
         };
@@ -499,12 +733,48 @@ impl AiEngine {
         // Post-process generated string: strip quotes, trim markers
         let cleaned = clean_ai_output(&output_str);
 
+        if was_cancelled {
+            return RewriteResult {
+                original: text.to_string(),
+                revised: cleaned,
+                mode: mode.title().to_string(),
+                engine: "Qwen 2.5 0.5B Neural (Cancelled)".to_string(),
+                latency_ms: Some(total_latency_ms),
+                prompt_eval_ms: Some(prompt_eval_ms),
+                token_eval_ms: Some(token_eval_ms),
+                tokens_generated: Some(num_tokens),
+                tokens_per_sec: Some(tokens_per_sec),
+                model_name: Some(loaded.model_name.clone()),
+                status: "cancelled".to_string(),
+                error_message: Some("Inference was cancelled by user".to_string()),
+            };
+        }
+
+        if cleaned.is_empty() {
+            return RewriteResult {
+                original: text.to_string(),
+                revised: String::new(),
+                mode: mode.title().to_string(),
+                engine: "Qwen 2.5 0.5B Neural (Local GGUF)".to_string(),
+                latency_ms: Some(total_latency_ms),
+                prompt_eval_ms: Some(prompt_eval_ms),
+                token_eval_ms: Some(token_eval_ms),
+                tokens_generated: Some(num_tokens),
+                tokens_per_sec: Some(tokens_per_sec),
+                model_name: Some(loaded.model_name.clone()),
+                status: "empty_output".to_string(),
+                error_message: Some("Model returned an empty response".to_string()),
+            };
+        }
+
         RewriteResult {
             original: text.to_string(),
             revised: cleaned,
             mode: mode.title().to_string(),
             engine: "Qwen 2.5 0.5B Neural (Local GGUF)".to_string(),
-            latency_ms: Some(latency_ms),
+            latency_ms: Some(total_latency_ms),
+            prompt_eval_ms: Some(prompt_eval_ms),
+            token_eval_ms: Some(token_eval_ms),
             tokens_generated: Some(num_tokens),
             tokens_per_sec: Some(tokens_per_sec),
             model_name: Some(loaded.model_name.clone()),
@@ -518,38 +788,28 @@ impl AiEngine {
 fn clean_ai_output(raw: &str) -> String {
     let mut s = raw.trim();
 
-    // Strip leading conversational phrases if any slipped through
-    let prefixes = [
-        "Here is the rewritten text:",
-        "Here's the rewritten text:",
-        "Rewritten text:",
-        "Here is the revised sentence:",
-        "Here's the revised sentence:",
-        "Revised sentence:",
-        "Sure, here is the text:",
-        "Sure, here's the text:",
-    ];
-
-    for prefix in prefixes {
-        if s.to_lowercase().starts_with(&prefix.to_lowercase()) {
-            s = s[prefix.len()..].trim();
-        }
+    // Strip ChatML tags if any leaked
+    if let Some(pos) = s.find("<|im_end|>") {
+        s = &s[..pos];
+    }
+    if let Some(pos) = s.find("<|im_start|>") {
+        s = &s[..pos];
     }
 
-    // Strip wrapping quotes
-    if (s.starts_with('"') && s.ends_with('"')) || (s.starts_with('\'') && s.ends_with('\'')) {
-        if s.len() >= 2 {
-            s = &s[1..s.len() - 1].trim();
-        }
+    s = s.trim();
+
+    // Strip leading "Passive:" or "Active:" if model mirrored the prompt label
+    if s.starts_with("Passive:") || s.starts_with("passive:") {
+        s = s[8..].trim();
+    } else if s.starts_with("Active:") || s.starts_with("active:") {
+        s = s[7..].trim();
     }
 
-    // Strip markdown code fences if wrapped
-    if s.starts_with("```") && s.ends_with("```") {
-        let lines: Vec<&str> = s.lines().collect();
-        if lines.len() >= 2 {
-            let inner = lines[1..lines.len() - 1].join("\n");
-            return inner.trim().to_string();
-        }
+    // Strip enclosing quotes if model added them
+    if (s.starts_with('"') && s.ends_with('"') && s.len() >= 2)
+        || (s.starts_with('\'') && s.ends_with('\'') && s.len() >= 2)
+    {
+        s = &s[1..s.len() - 1].trim();
     }
 
     s.to_string()

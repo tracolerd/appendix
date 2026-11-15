@@ -93,7 +93,7 @@ pub extern "system" fn Java_org_appendix_appendix_keyboard_NativeEngine_nativeRe
         }
     };
 
-    let rewrite_mode = RewriteMode::from_i32(mode);
+    let rewrite_mode = RewriteMode::from_i32(mode).unwrap_or(RewriteMode::Rephrase);
     let result = crate::ai_engine::AiEngine::rewrite(&input, rewrite_mode, None);
 
     let json = serde_json::to_string(&result).unwrap_or_else(|_| "{}".to_string());

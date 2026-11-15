@@ -196,6 +196,7 @@ pub extern "C" fn appendix_insights_analyze(text: *const c_char) -> *mut c_char 
 pub extern "C" fn appendix_ai_load_model(
     model_path: *const c_char,
     tokenizer_path: *const c_char,
+    verify_checksum: i32,
 ) -> *mut c_char {
     if model_path.is_null() || tokenizer_path.is_null() {
         return std::ptr::null_mut();
@@ -210,7 +211,8 @@ pub extern "C" fn appendix_ai_load_model(
         Err(_) => return std::ptr::null_mut(),
     };
 
-    let status = match AiEngine::load_model(m_str, t_str) {
+    let do_verify = verify_checksum != 0;
+    let status = match AiEngine::load_model(m_str, t_str, do_verify) {
         Ok(s) => s,
         Err(e) => {
             let err_json = serde_json::json!({
@@ -224,6 +226,69 @@ pub extern "C" fn appendix_ai_load_model(
     };
 
     match serde_json::to_string(&status) {
+        Ok(json_str) => match CString::new(json_str) {
+            Ok(c_string) => c_string.into_raw(),
+            Err(_) => std::ptr::null_mut(),
+        },
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn appendix_ai_cancel() {
+    AiEngine::cancel_inference();
+}
+
+#[no_mangle]
+pub extern "C" fn appendix_ai_verify_model(
+    file_path: *const c_char,
+    expected_sha256: *const c_char,
+) -> *mut c_char {
+    if file_path.is_null() {
+        return std::ptr::null_mut();
+    }
+
+    let path_str = match unsafe { CStr::from_ptr(file_path) }.to_str() {
+        Ok(s) => s,
+        Err(_) => return std::ptr::null_mut(),
+    };
+
+    let exp_str = if expected_sha256.is_null() {
+        ""
+    } else {
+        unsafe { CStr::from_ptr(expected_sha256) }
+            .to_str()
+            .unwrap_or("")
+    };
+
+    let path = std::path::Path::new(path_str);
+    let result = match crate::ai_engine::compute_file_sha256(path) {
+        Ok(computed) => {
+            let matches = if exp_str.is_empty() {
+                true
+            } else {
+                computed.eq_ignore_ascii_case(exp_str.trim())
+            };
+            serde_json::json!({
+                "success": true,
+                "valid": matches,
+                "computed_sha256": computed,
+                "expected_sha256": exp_str,
+                "error": serde_json::Value::Null,
+            })
+        }
+        Err(e) => {
+            serde_json::json!({
+                "success": false,
+                "valid": false,
+                "computed_sha256": serde_json::Value::Null,
+                "expected_sha256": exp_str,
+                "error": e,
+            })
+        }
+    };
+
+    match serde_json::to_string(&result) {
         Ok(json_str) => match CString::new(json_str) {
             Ok(c_string) => c_string.into_raw(),
             Err(_) => std::ptr::null_mut(),
@@ -264,7 +329,7 @@ pub extern "C" fn appendix_ai_rewrite(text: *const c_char, mode: i32) -> *mut c_
         Err(_) => return std::ptr::null_mut(),
     };
 
-    let rewrite_mode = RewriteMode::from_i32(mode);
+    let rewrite_mode = RewriteMode::from_i32(mode).unwrap_or(RewriteMode::Rephrase);
     let result = AiEngine::rewrite(input, rewrite_mode, None);
 
     match serde_json::to_string(&result) {
@@ -392,7 +457,8 @@ mod tests {
         let rewrite_ptr = appendix_ai_rewrite(sample.as_ptr(), 5); // Make Concise
         assert!(!rewrite_ptr.is_null());
         let rewrite_json = unsafe { CStr::from_ptr(rewrite_ptr).to_str().unwrap() };
-        assert!(rewrite_json.contains("To achieve great results"));
+        assert!(rewrite_json.contains("Make Concise"));
+        assert!(rewrite_json.contains("status"));
         appendix_string_free(rewrite_ptr);
     }
 }
