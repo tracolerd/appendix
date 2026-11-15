@@ -23,14 +23,25 @@ class AiPanel extends StatefulWidget {
 class _AiPanelState extends State<AiPanel> {
   RewriteMode _selectedMode = RewriteMode.rephrase;
   RewriteResult? _currentResult;
+  AiModelStatus? _modelStatus;
   bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
+    _checkModelStatus();
     if (widget.initialText.trim().isNotEmpty) {
       _executeRewrite(_selectedMode);
     }
+  }
+
+  void _checkModelStatus() {
+    try {
+      final status = NativeGrammarEngine.instance.getAiStatus();
+      setState(() {
+        _modelStatus = status;
+      });
+    } catch (_) {}
   }
 
   void _executeRewrite(RewriteMode mode) {
@@ -49,6 +60,8 @@ class _AiPanelState extends State<AiPanel> {
         setState(() {
           _currentResult = res;
           _isLoading = false;
+          // Refresh model status after inference
+          _modelStatus = NativeGrammarEngine.instance.getAiStatus();
         });
       }
     });
@@ -99,6 +112,34 @@ class _AiPanelState extends State<AiPanel> {
             Text(
               'Transform your text locally with zero cloud transmission.',
               style: TextStyle(fontSize: 13, color: textSecondary),
+            ),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: (_modelStatus?.loaded == true || (_currentResult?.engine.contains('Neural') ?? false))
+                        ? AppendixTheme.successGreen
+                        : const Color(0xFFF59E0B),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  (_modelStatus?.loaded == true || (_currentResult?.engine.contains('Neural') ?? false))
+                      ? 'Qwen 2.5 0.5B Neural SLM (Local GGUF - Offline)'
+                      : 'Local AI: Standby / Ready to Load',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: (_modelStatus?.loaded == true || (_currentResult?.engine.contains('Neural') ?? false))
+                        ? AppendixTheme.successGreen
+                        : textSecondary,
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 16),
             const Divider(height: 1),
@@ -218,6 +259,23 @@ class _AiPanelState extends State<AiPanel> {
                         height: 1.45,
                       ),
                     ),
+                    if (_currentResult?.latencyMs != null && _currentResult!.latencyMs! > 0) ...[
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          const Icon(Icons.bolt_rounded, size: 14, color: AppendixTheme.accentBlue),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${(_currentResult!.latencyMs! / 1000).toStringAsFixed(2)}s  •  ${_currentResult!.tokensGenerated ?? 0} tokens  •  ${(_currentResult!.tokensPerSec ?? 0).toStringAsFixed(1)} tok/s',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
               ),

@@ -55,25 +55,25 @@ impl RewriteMode {
     pub fn system_prompt(&self) -> &'static str {
         match self {
             RewriteMode::Rephrase => {
-                "You are an expert English writing assistant. Rephrase the input text clearly, preserving the exact original meaning. Output ONLY the rewritten text without conversational filler, notes, or quotes."
+                "You are an expert English writing assistant. Rephrase the input text with fresh, natural wording while preserving the exact original meaning. Output ONLY the rewritten text without conversational filler, notes, or quotes."
             }
             RewriteMode::MakeProfessional => {
-                "You are a business communications specialist. Rewrite the text into a polished, respectful, and authoritative professional tone. Output ONLY the rewritten text without conversational filler, notes, or quotes."
+                "You are a business communications specialist. Rewrite the text into a polished, respectful, and authoritative professional tone suitable for corporate correspondence. Output ONLY the rewritten text without conversational filler, notes, or quotes."
             }
             RewriteMode::MakeAcademic => {
                 "You are an academic editor. Rewrite the text using scholarly tone, precise terminology, objective voice, and rigorous sentence structure. Output ONLY the rewritten text without conversational filler, notes, or quotes."
             }
             RewriteMode::MakeFormal => {
-                "You are a formal writing stylist. Rewrite the text into formal English, eliminating slang, contractions, and colloquialisms. Output ONLY the rewritten text without conversational filler, notes, or quotes."
+                "You are an executive formal writing stylist. Rewrite the text into an elevated, distinguished, formal register, eliminating slang, contractions, and colloquialisms. Output ONLY the rewritten text without conversational filler, notes, or quotes."
             }
             RewriteMode::MakeCasual => {
-                "You are a friendly writing coach. Rewrite the text into a warm, natural, engaging casual tone. Output ONLY the rewritten text without conversational filler, notes, or quotes."
+                "You are a friendly writing coach. Rewrite the text into a warm, natural, engaging casual tone with friendly, conversational phrasing. Output ONLY the rewritten text without conversational filler, notes, or quotes."
             }
             RewriteMode::MakeConcise => {
-                "You are a minimalist editor. Condense the text by removing filler words and redundancy while keeping all key facts intact. Output ONLY the concise text without conversational filler, notes, or quotes."
+                "You are a minimalist editor. Condense the text by removing filler words, circumlocution, and redundancy while keeping all key facts intact. Output ONLY the concise text without conversational filler, notes, or quotes."
             }
             RewriteMode::Expand => {
-                "You are an expressive writer. Elaboration and expand the text with vivid context and nuanced description while preserving original intent. Output ONLY the expanded text without conversational filler, notes, or quotes."
+                "You are an expressive writer. Elaborate and expand the text with vivid context and nuanced description while preserving original intent. Output ONLY the expanded text without conversational filler, notes, or quotes."
             }
             RewriteMode::ImproveClarity => {
                 "You are a clarity editor. Restructure awkward phrasing, ambiguous pronouns, and clunky syntax to make the sentence effortless to comprehend. Output ONLY the revised text without conversational filler, notes, or quotes."
@@ -85,10 +85,10 @@ impl RewriteMode {
                 "You are a plain-language advocate. Simplify complex clauses and arcane jargon into simple, crisp English that anyone can instantly understand. Output ONLY the simplified text without conversational filler, notes, or quotes."
             }
             RewriteMode::ActiveToPassive => {
-                "Convert the sentence from active voice into grammatically flawless passive voice. Output ONLY the converted text."
+                "You are a grammar specialist. Convert the sentence into passive voice, placing the recipient of the action at the beginning. Output ONLY the passive voice text without conversational filler, notes, or quotes."
             }
             RewriteMode::PassiveToActive => {
-                "Convert the sentence from passive voice into punchy, direct active voice. Output ONLY the converted text."
+                "You are a writing editor. Convert passive constructions into punchy, direct active voice with the subject performing the action. Output ONLY the active voice text without conversational filler, notes, or quotes."
             }
         }
     }
@@ -183,7 +183,23 @@ pub struct RewriteResult {
     pub original: String,
     pub revised: String,
     pub mode: String,
-    pub engine: String, // "SLM" or "Heuristic"
+    pub engine: String,
+    #[serde(default)]
+    pub latency_ms: Option<f64>,
+    #[serde(default)]
+    pub tokens_generated: Option<usize>,
+    #[serde(default)]
+    pub tokens_per_sec: Option<f64>,
+    #[serde(default)]
+    pub model_name: Option<String>,
+    #[serde(default = "default_status")]
+    pub status: String,
+    #[serde(default)]
+    pub error_message: Option<String>,
+}
+
+fn default_status() -> String {
+    "success".to_string()
 }
 
 #[cfg(test)]

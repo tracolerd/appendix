@@ -28,6 +28,17 @@ typedef _AiRewriteC = ffi.Pointer<Utf8> Function(
 typedef _AiRewriteDart = ffi.Pointer<Utf8> Function(
     ffi.Pointer<Utf8> text, int mode);
 
+typedef _AiLoadModelC = ffi.Pointer<Utf8> Function(
+    ffi.Pointer<Utf8> modelPath, ffi.Pointer<Utf8> tokenizerPath);
+typedef _AiLoadModelDart = ffi.Pointer<Utf8> Function(
+    ffi.Pointer<Utf8> modelPath, ffi.Pointer<Utf8> tokenizerPath);
+
+typedef _AiUnloadModelC = ffi.Int32 Function();
+typedef _AiUnloadModelDart = int Function();
+
+typedef _AiStatusC = ffi.Pointer<Utf8> Function();
+typedef _AiStatusDart = ffi.Pointer<Utf8> Function();
+
 typedef _HistorySaveC = ffi.Int64 Function(ffi.Pointer<Utf8> dbPath,
     ffi.Pointer<Utf8> content, ffi.Size wordCount, ffi.Double readability);
 typedef _HistorySaveDart = int Function(ffi.Pointer<Utf8> dbPath,
@@ -64,6 +75,9 @@ class NativeGrammarEngine {
   _EngineCheckDart? _engineCheck;
   _InsightsAnalyzeDart? _insightsAnalyze;
   _AiRewriteDart? _aiRewrite;
+  _AiLoadModelDart? _aiLoadModel;
+  _AiUnloadModelDart? _aiUnloadModel;
+  _AiStatusDart? _aiStatus;
   _HistorySaveDart? _historySave;
   _HistoryListDart? _historyList;
   _HistoryDeleteDart? _historyDelete;
@@ -93,6 +107,11 @@ class NativeGrammarEngine {
             _InsightsAnalyzeDart>('appendix_insights_analyze');
         _aiRewrite = _dylib!
             .lookupFunction<_AiRewriteC, _AiRewriteDart>('appendix_ai_rewrite');
+        try {
+          _aiLoadModel = _dylib!.lookupFunction<_AiLoadModelC, _AiLoadModelDart>('appendix_ai_load_model');
+          _aiUnloadModel = _dylib!.lookupFunction<_AiUnloadModelC, _AiUnloadModelDart>('appendix_ai_unload_model');
+          _aiStatus = _dylib!.lookupFunction<_AiStatusC, _AiStatusDart>('appendix_ai_status');
+        } catch (_) {}
         _historySave = _dylib!.lookupFunction<_HistorySaveC,
             _HistorySaveDart>('appendix_history_save');
         _historyList = _dylib!.lookupFunction<_HistoryListC,
@@ -245,6 +264,60 @@ class NativeGrammarEngine {
     }
 
     return _fallbackRewrite(text, mode);
+  }
+
+  /// Load a local GGUF AI model into memory
+  AiModelStatus loadAiModel(String modelPath, String tokenizerPath) {
+    if (_isInitialized && _aiLoadModel != null && _stringFree != null) {
+      final nativeModel = modelPath.toNativeUtf8();
+      final nativeTokenizer = tokenizerPath.toNativeUtf8();
+      try {
+        final resultPtr = _aiLoadModel!(nativeModel, nativeTokenizer);
+        if (resultPtr != ffi.nullptr) {
+          try {
+            final jsonStr = resultPtr.toDartString();
+            return AiModelStatus.parse(jsonStr);
+          } finally {
+            _stringFree!(resultPtr);
+          }
+        }
+      } catch (_) {
+      } finally {
+        calloc.free(nativeModel);
+        calloc.free(nativeTokenizer);
+      }
+    }
+    return const AiModelStatus(loaded: false);
+  }
+
+  /// Unload AI model from memory to reclaim RAM
+  bool unloadAiModel() {
+    if (_isInitialized && _aiUnloadModel != null) {
+      try {
+        return _aiUnloadModel!() == 0;
+      } catch (_) {
+        return false;
+      }
+    }
+    return false;
+  }
+
+  /// Check current AI model status
+  AiModelStatus getAiStatus() {
+    if (_isInitialized && _aiStatus != null && _stringFree != null) {
+      try {
+        final resultPtr = _aiStatus!();
+        if (resultPtr != ffi.nullptr) {
+          try {
+            final jsonStr = resultPtr.toDartString();
+            return AiModelStatus.parse(jsonStr);
+          } finally {
+            _stringFree!(resultPtr);
+          }
+        }
+      } catch (_) {}
+    }
+    return const AiModelStatus(loaded: false);
   }
 
   /// Save snapshot to local SQLite history

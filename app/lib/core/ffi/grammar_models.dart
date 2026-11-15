@@ -192,12 +192,24 @@ class RewriteResult {
   final String revised;
   final String mode;
   final String engine;
+  final double? latencyMs;
+  final int? tokensGenerated;
+  final double? tokensPerSec;
+  final String? modelName;
+  final String status;
+  final String? errorMessage;
 
   const RewriteResult({
     required this.original,
     required this.revised,
     required this.mode,
     required this.engine,
+    this.latencyMs,
+    this.tokensGenerated,
+    this.tokensPerSec,
+    this.modelName,
+    this.status = 'success',
+    this.errorMessage,
   });
 
   factory RewriteResult.fromJson(Map<String, dynamic> json) {
@@ -206,6 +218,12 @@ class RewriteResult {
       revised: json['revised'] as String? ?? '',
       mode: json['mode'] as String? ?? 'Rephrase',
       engine: json['engine'] as String? ?? 'Offline',
+      latencyMs: (json['latency_ms'] as num?)?.toDouble(),
+      tokensGenerated: (json['tokens_generated'] as num?)?.toInt(),
+      tokensPerSec: (json['tokens_per_sec'] as num?)?.toDouble(),
+      modelName: json['model_name'] as String?,
+      status: json['status'] as String? ?? 'success',
+      errorMessage: json['error_message'] as String?,
     );
   }
 
@@ -218,6 +236,51 @@ class RewriteResult {
       return RewriteResult.fromJson(decoded);
     } catch (_) {
       return const RewriteResult(original: '', revised: '', mode: '', engine: '');
+    }
+  }
+}
+
+/// Status of the local SLM neural model
+class AiModelStatus {
+  final bool loaded;
+  final String modelName;
+  final String modelPath;
+  final String tokenizerPath;
+  final double modelSizeMb;
+  final String engine;
+  final int uptimeSeconds;
+
+  const AiModelStatus({
+    required this.loaded,
+    this.modelName = '',
+    this.modelPath = '',
+    this.tokenizerPath = '',
+    this.modelSizeMb = 0.0,
+    this.engine = 'None',
+    this.uptimeSeconds = 0,
+  });
+
+  factory AiModelStatus.fromJson(Map<String, dynamic> json) {
+    return AiModelStatus(
+      loaded: json['loaded'] as bool? ?? false,
+      modelName: json['model_name'] as String? ?? '',
+      modelPath: json['model_path'] as String? ?? '',
+      tokenizerPath: json['tokenizer_path'] as String? ?? '',
+      modelSizeMb: (json['model_size_mb'] as num?)?.toDouble() ?? 0.0,
+      engine: json['engine'] as String? ?? 'None',
+      uptimeSeconds: (json['uptime_seconds'] as num?)?.toInt() ?? 0,
+    );
+  }
+
+  static AiModelStatus parse(String jsonString) {
+    if (jsonString.trim().isEmpty) {
+      return const AiModelStatus(loaded: false);
+    }
+    try {
+      final decoded = jsonDecode(jsonString) as Map<String, dynamic>;
+      return AiModelStatus.fromJson(decoded);
+    } catch (_) {
+      return const AiModelStatus(loaded: false);
     }
   }
 }

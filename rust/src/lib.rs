@@ -1,3 +1,4 @@
+pub mod ai_engine;
 pub mod ai_rephrase;
 pub mod history;
 pub mod insights;
@@ -12,7 +13,8 @@ use harper_core::spell::FstDictionary;
 use harper_core::{Dialect, Document, Lrc};
 use serde::{Deserialize, Serialize};
 
-use ai_rephrase::{RewriteMode, RewriteResult};
+use ai_engine::AiEngine;
+use ai_rephrase::RewriteMode;
 use history::HistoryStorage;
 use insights::InsightsEngine;
 
@@ -191,6 +193,66 @@ pub extern "C" fn appendix_insights_analyze(text: *const c_char) -> *mut c_char 
 }
 
 #[no_mangle]
+pub extern "C" fn appendix_ai_load_model(
+    model_path: *const c_char,
+    tokenizer_path: *const c_char,
+) -> *mut c_char {
+    if model_path.is_null() || tokenizer_path.is_null() {
+        return std::ptr::null_mut();
+    }
+
+    let m_str = match unsafe { CStr::from_ptr(model_path) }.to_str() {
+        Ok(s) => s,
+        Err(_) => return std::ptr::null_mut(),
+    };
+    let t_str = match unsafe { CStr::from_ptr(tokenizer_path) }.to_str() {
+        Ok(s) => s,
+        Err(_) => return std::ptr::null_mut(),
+    };
+
+    let status = match AiEngine::load_model(m_str, t_str) {
+        Ok(s) => s,
+        Err(e) => {
+            let err_json = serde_json::json!({
+                "loaded": false,
+                "error": e,
+            });
+            return CString::new(err_json.to_string())
+                .map(|c| c.into_raw())
+                .unwrap_or(std::ptr::null_mut());
+        }
+    };
+
+    match serde_json::to_string(&status) {
+        Ok(json_str) => match CString::new(json_str) {
+            Ok(c_string) => c_string.into_raw(),
+            Err(_) => std::ptr::null_mut(),
+        },
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn appendix_ai_unload_model() -> i32 {
+    match AiEngine::unload_model() {
+        Ok(_) => 0,
+        Err(_) => -1,
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn appendix_ai_status() -> *mut c_char {
+    let status = AiEngine::get_status();
+    match serde_json::to_string(&status) {
+        Ok(json_str) => match CString::new(json_str) {
+            Ok(c_string) => c_string.into_raw(),
+            Err(_) => std::ptr::null_mut(),
+        },
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+#[no_mangle]
 pub extern "C" fn appendix_ai_rewrite(text: *const c_char, mode: i32) -> *mut c_char {
     if text.is_null() {
         return std::ptr::null_mut();
@@ -203,14 +265,7 @@ pub extern "C" fn appendix_ai_rewrite(text: *const c_char, mode: i32) -> *mut c_
     };
 
     let rewrite_mode = RewriteMode::from_i32(mode);
-    let revised = rewrite_mode.heuristic_fallback(input);
-
-    let result = RewriteResult {
-        original: input.to_string(),
-        revised,
-        mode: rewrite_mode.title().to_string(),
-        engine: "Heuristic (Offline)".to_string(),
-    };
+    let result = AiEngine::rewrite(input, rewrite_mode, None);
 
     match serde_json::to_string(&result) {
         Ok(json_str) => match CString::new(json_str) {
