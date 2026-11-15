@@ -136,8 +136,21 @@ class NativeGrammarEngine {
         return ffi.DynamicLibrary.open('appendix_core.dll');
       } catch (_) {}
     } else if (Platform.isMacOS) {
+      final macCandidates = [
+        'libappendix_core.dylib',
+        '../Frameworks/libappendix_core.dylib',
+        '@rpath/libappendix_core.dylib',
+        '../rust/target/release/libappendix_core.dylib',
+        '../rust/target/debug/libappendix_core.dylib',
+      ];
+      for (final p in macCandidates) {
+        try {
+          return ffi.DynamicLibrary.open(p);
+        } catch (_) {}
+      }
+    } else if (Platform.isIOS) {
       try {
-        return ffi.DynamicLibrary.open('libappendix_core.dylib');
+        return ffi.DynamicLibrary.process();
       } catch (_) {}
     } else if (Platform.isAndroid || Platform.isLinux) {
       try {

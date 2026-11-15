@@ -175,3 +175,4 @@ class HistoryDialog extends StatelessWidget {
     );
   }
 }
+

@@ -31,3 +31,4 @@ object NativeEngine {
     external fun nativeRephrase(text: String, mode: Int): String
     external fun nativeFreeEngine(enginePtr: Long)
 }
+

@@ -215,3 +215,4 @@ mod tests {
         assert_eq!(output, "We do not want to purchase numerous stuff.");
     }
 }
+

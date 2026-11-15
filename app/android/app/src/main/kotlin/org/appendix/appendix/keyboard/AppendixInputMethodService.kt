@@ -632,3 +632,4 @@ class AppendixInputMethodService : InputMethodService() {
         val suggestions: List<String>
     )
 }
+

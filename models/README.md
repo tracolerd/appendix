@@ -26,3 +26,4 @@ If you prefer to download the model file yourself:
 1. Download any `.gguf` file from the [Qwen HuggingFace repository](https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF).
 2. Place the file inside the `models/` directory or import it directly inside the Appendix application settings.
 3. The app will immediately detect the local file and switch to on-device AI inference.
+
