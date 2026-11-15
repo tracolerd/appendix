@@ -142,9 +142,7 @@ jobs:
       - name: Package macOS Artifact
         run: |
           mkdir -p dist
-          cd app/build/macos/Build/Products/Release
-          zip -r ../../../../../dist/appendix-macos.zip appendix.app
-          cd ../../../../../
+          (cd app/build/macos/Build/Products/Release && zip -r -y "${GITHUB_WORKSPACE}/dist/appendix-macos.zip" appendix.app)
           shasum -a 256 dist/appendix-macos.zip > dist/appendix-macos.sha256
 
       - name: Upload macOS Artifact
