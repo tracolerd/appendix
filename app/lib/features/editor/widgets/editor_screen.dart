@@ -6,6 +6,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../ai_assistant/ai_panel.dart';
 import '../../history/history_dialog.dart';
 import '../../insights/insights_sheet.dart';
+import '../../keyboard_settings/keyboard_settings_screen.dart';
 import '../controllers/writing_editor_controller.dart';
 import 'editor_toolbar.dart';
 import 'stats_footer.dart';
@@ -145,6 +146,12 @@ class _EditorScreenState extends State<EditorScreen> {
     );
   }
 
+  void _handleOpenKeyboard() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const KeyboardSettingsScreen()),
+    );
+  }
+
   void _handleCopy() {
     if (_controller.text.isNotEmpty) {
       Clipboard.setData(ClipboardData(text: _controller.text));
@@ -204,6 +211,7 @@ class _EditorScreenState extends State<EditorScreen> {
               onOpenInsights: _handleOpenInsights,
               onOpenHistory: _handleOpenHistory,
               onSaveDraft: _handleSaveDraft,
+              onOpenKeyboard: _handleOpenKeyboard,
               onCopy: _handleCopy,
               onClear: _handleClear,
               onToggleTheme: widget.onToggleTheme,

@@ -9,6 +9,7 @@ class EditorToolbar extends StatelessWidget {
   final VoidCallback onOpenInsights;
   final VoidCallback onOpenHistory;
   final VoidCallback onSaveDraft;
+  final VoidCallback? onOpenKeyboard;
   final VoidCallback onCopy;
   final VoidCallback onClear;
   final VoidCallback onToggleTheme;
@@ -24,6 +25,7 @@ class EditorToolbar extends StatelessWidget {
     required this.onOpenInsights,
     required this.onOpenHistory,
     required this.onSaveDraft,
+    this.onOpenKeyboard,
     required this.onCopy,
     required this.onClear,
     required this.onToggleTheme,
@@ -201,6 +203,13 @@ class EditorToolbar extends StatelessWidget {
                 icon: const Icon(Icons.delete_outline_rounded, size: 17),
                 onPressed: onClear,
               ),
+              if (onOpenKeyboard != null)
+                IconButton(
+                  visualDensity: VisualDensity.compact,
+                  tooltip: 'Appendix Keyboard Setup',
+                  icon: const Icon(Icons.keyboard_outlined, size: 17),
+                  onPressed: onOpenKeyboard,
+                ),
               IconButton(
                 visualDensity: VisualDensity.compact,
                 tooltip: isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode',

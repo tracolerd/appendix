@@ -1,6 +1,7 @@
 pub mod ai_rephrase;
 pub mod history;
 pub mod insights;
+pub mod jni_bridge;
 
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
