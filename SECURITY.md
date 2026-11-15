@@ -15,3 +15,4 @@ If you discover a security or privacy vulnerability:
 2. Email the maintainer directly at: `scrollfaiyaz@gmail.com`
 3. Include details of the vulnerability, steps to reproduce, and affected platforms.
 4. We aim to acknowledge reports within 48 hours and provide a remediation plan promptly.
+

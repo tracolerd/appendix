@@ -27,3 +27,4 @@ Thank you for your interest in contributing to **Appendix**! As an open-source, 
 - Keep pull requests focused on a single topic or bug fix.
 - Include automated tests for new functionality.
 - Update documentation and architectural records where applicable.
+

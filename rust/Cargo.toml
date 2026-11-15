@@ -1,0 +1,15 @@
+[package]
+name = "appendix_core"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "staticlib", "lib"]
+
+[dependencies]
+harper-core = "3.0.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "2.0"
+chrono = { version = "0.4", features = ["serde"] }
+rusqlite = { version = "0.33", features = ["bundled"] }

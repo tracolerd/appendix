@@ -79,3 +79,14 @@ models/*.bin
 models/*.onnx
 !models/README.md
 !models/model_manifest.json
+
+
+# Native binaries
+*.dll
+*.dylib
+*.so
+*.lib
+*.pdb
+*.exp
+*.d
+*.rlib
