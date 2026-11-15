@@ -73,3 +73,4 @@ void appendix_string_free(char* ptr);
 #endif
 
 #endif // APPENDIX_CORE_H
+

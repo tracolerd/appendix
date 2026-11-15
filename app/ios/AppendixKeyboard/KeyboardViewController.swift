@@ -429,3 +429,4 @@ public final class KeyboardViewController: UIInputViewController {
         triggerGrammarCheck(delay: 0.2)
     }
 }
+

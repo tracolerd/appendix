@@ -62,3 +62,4 @@ xcodebuild -create-xcframework \
 
 echo "✓ Created XCFramework: ${IOS_OUT_DIR}/AppendixCore.xcframework"
 echo "=== Apple Build Complete ==="
+

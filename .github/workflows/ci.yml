@@ -1,0 +1,113 @@
+name: Continuous Integration
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  rust-core:
+    name: Rust Core Tests & Analysis
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+
+      - name: Run Cargo Tests
+        working-directory: rust
+        run: cargo test --verbose
+
+      - name: Run Cargo Check
+        working-directory: rust
+        run: cargo check --verbose
+
+  flutter-app:
+    name: Flutter Tests & Analysis
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.50.0'
+          channel: 'stable'
+          cache: true
+
+      - name: Install Dependencies
+        working-directory: app
+        run: flutter pub get
+
+      - name: Verify Code Formatting & Lints
+        working-directory: app
+        run: flutter analyze
+
+      - name: Run Flutter Widget & Unit Tests
+        working-directory: app
+        run: flutter test --coverage
+
+  android-build:
+    name: Android Build Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.50.0'
+          channel: 'stable'
+          cache: true
+
+      - name: Setup Rust & NDK Target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android, x86_64-linux-android
+
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk
+
+      - name: Compile Rust Android Libraries
+        working-directory: rust
+        run: |
+          cargo ndk -t arm64-v8a -t x86_64 -o ../app/android/app/src/main/jniLibs build --release
+
+      - name: Build Android APK
+        working-directory: app
+        run: flutter build apk --debug
+
+  apple-build:
+    name: macOS & iOS Build Validation
+    runs-on: macos-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin, x86_64-apple-darwin, aarch64-apple-ios, aarch64-apple-ios-sim, x86_64-apple-ios
+
+      - name: Build Apple Platforms
+        run: |
+          chmod +x scripts/build_apple.sh
+          ./scripts/build_apple.sh

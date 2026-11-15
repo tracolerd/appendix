@@ -1,0 +1,194 @@
+name: Multi-Platform Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    name: Build Windows Desktop Release
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.50.0'
+          channel: 'stable'
+
+      - name: Build Rust Core DLL
+        working-directory: rust
+        run: cargo build --release
+
+      - name: Copy DLL to App
+        run: copy rust\target\release\appendix_core.dll app\appendix_core.dll
+
+      - name: Build Flutter Windows
+        working-directory: app
+        run: |
+          flutter pub get
+          flutter build windows --release
+
+      - name: Package Windows Artifacts
+        shell: pwsh
+        run: |
+          $ver = "${{ github.ref_name }}"
+          $dist = "dist\appendix-windows-x64-$ver"
+          New-Item -ItemType Directory -Force -Path $dist
+          Copy-Item -Path "app\build\windows\x64\runner\Release\*" -Destination $dist -Recurse
+          Copy-Item -Path "app\appendix_core.dll" -Destination $dist -Force
+          Copy-Item -Path "LICENSE", "README.md" -Destination $dist
+          Compress-Archive -Path "$dist\*" -DestinationPath "dist\appendix-windows-x64.zip" -Force
+          Get-FileHash -Path "dist\appendix-windows-x64.zip" -Algorithm SHA256 | Out-File "dist\appendix-windows-x64.sha256"
+
+      - name: Upload Windows Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: appendix-windows-x64
+          path: dist/appendix-windows-x64.*
+
+  build-android:
+    name: Build Android Release APK
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.50.0'
+          channel: 'stable'
+
+      - name: Setup Rust & Targets
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android, x86_64-linux-android
+
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk
+
+      - name: Compile Rust Core for Android
+        working-directory: rust
+        run: cargo ndk -t arm64-v8a -t x86_64 -o ../app/android/app/src/main/jniLibs build --release
+
+      - name: Build Android APK
+        working-directory: app
+        run: flutter build apk --release
+
+      - name: Package Android Artifact
+        run: |
+          mkdir -p dist
+          cp app/build/app/outputs/flutter-apk/app-release.apk dist/appendix-android.apk
+          sha256sum dist/appendix-android.apk > dist/appendix-android.sha256
+
+      - name: Upload Android Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: appendix-android
+          path: dist/appendix-android.*
+
+  build-macos:
+    name: Build macOS Universal Release
+    runs-on: macos-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin, x86_64-apple-darwin
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.50.0'
+          channel: 'stable'
+
+      - name: Compile macOS Universal dylib
+        working-directory: rust
+        run: |
+          cargo build --release --target aarch64-apple-darwin
+          cargo build --release --target x86_64-apple-darwin
+          lipo -create \
+            target/aarch64-apple-darwin/release/libappendix_core.dylib \
+            target/x86_64-apple-darwin/release/libappendix_core.dylib \
+            -output ../app/macos/libappendix_core.dylib
+
+      - name: Build Flutter macOS
+        working-directory: app
+        run: |
+          flutter pub get
+          flutter build macos --release
+
+      - name: Package macOS Artifact
+        run: |
+          mkdir -p dist
+          cd app/build/macos/Build/Products/Release
+          zip -r ../../../../../dist/appendix-macos.zip appendix.app
+          cd ../../../../../
+          shasum -a 256 dist/appendix-macos.zip > dist/appendix-macos.sha256
+
+      - name: Upload macOS Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: appendix-macos
+          path: dist/appendix-macos.*
+
+  publish-release:
+    name: Publish GitHub Release
+    needs: [build-windows, build-android, build-macos]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Download Windows Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: appendix-windows-x64
+          path: release_assets
+
+      - name: Download Android Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: appendix-android
+          path: release_assets
+
+      - name: Download macOS Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: appendix-macos
+          path: release_assets
+
+      - name: Create Combined Checksums
+        run: |
+          cd release_assets
+          cat *.sha256 > SHA256SUMS.txt
+          rm -f *.sha256
+
+      - name: Draft GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release_assets/*
+          draft: false
+          prerelease: false
+          generate_release_notes: true
