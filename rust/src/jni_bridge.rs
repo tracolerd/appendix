@@ -2,7 +2,7 @@ use jni::objects::{JClass, JString};
 use jni::sys::{jint, jlong, jstring};
 use jni::JNIEnv;
 
-use crate::ai_rephrase::{RewriteMode, RewriteResult};
+use crate::ai_rephrase::RewriteMode;
 use crate::insights::InsightsEngine;
 use crate::{EnglishDialect, GrammarEngine};
 
@@ -93,14 +93,8 @@ pub extern "system" fn Java_org_appendix_appendix_keyboard_NativeEngine_nativeRe
         }
     };
 
-    let rewrite_mode = RewriteMode::from_i32(mode);
-    let revised = rewrite_mode.heuristic_fallback(&input);
-    let result = RewriteResult {
-        original: input,
-        revised,
-        mode: rewrite_mode.title().to_string(),
-        engine: "Heuristic (Offline)".to_string(),
-    };
+    let rewrite_mode = RewriteMode::from_i32(mode).unwrap_or(RewriteMode::Rephrase);
+    let result = crate::ai_engine::AiEngine::rewrite(&input, rewrite_mode, None);
 
     let json = serde_json::to_string(&result).unwrap_or_else(|_| "{}".to_string());
     env.new_string(json)

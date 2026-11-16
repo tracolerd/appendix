@@ -26,23 +26,26 @@ public final class NativeHarperBridge {
     public func setDialect(dialect: Int32) {
         guard dialect != currentDialect else { return }
         currentDialect = dialect
-        freeEngine()
-        initEngine(dialect: dialect)
+        if let ptr = enginePtr {
+            appendix_engine_set_dialect(ptr, dialect)
+        } else {
+            initEngine(dialect: dialect)
+        }
     }
 
     private func initEngine(dialect: Int32) {
         #if canImport(AppendixCore)
         enginePtr = appendix_engine_new(dialect)
+        #else
+        enginePtr = appendix_engine_new(dialect)
         #endif
     }
 
     private func freeEngine() {
-        #if canImport(AppendixCore)
         if let ptr = enginePtr {
             appendix_engine_free(ptr)
             enginePtr = nil
         }
-        #endif
     }
 
     public func checkText(_ text: String) -> [LintSuggestion] {
@@ -50,7 +53,6 @@ public final class NativeHarperBridge {
             return []
         }
 
-        #if canImport(AppendixCore)
         if let ptr = enginePtr {
             let cText = text.cString(using: .utf8)
             if let resultPtr = appendix_engine_check(ptr, cText) {
@@ -59,10 +61,8 @@ public final class NativeHarperBridge {
                 return parseLints(jsonString: jsonString, originalText: text)
             }
         }
-        #endif
 
-        // Offline Rule-based Heuristic Fallback
-        return runHeuristicCheck(text: text)
+        return []
     }
 
     private func parseLints(jsonString: String, originalText: String) -> [LintSuggestion] {
@@ -88,9 +88,9 @@ public final class NativeHarperBridge {
             }
 
             var targetWord = ""
-            if start < originalText.count && end <= originalText.count && start < end {
-                let startIndex = originalText.index(originalText.startIndex, offsetBy: start)
-                let endIndex = originalText.index(originalText.startIndex, offsetBy: end)
+            if let startIndex = originalText.index(originalText.startIndex, offsetBy: start, limitedBy: originalText.endIndex),
+               let endIndex = originalText.index(originalText.startIndex, offsetBy: end, limitedBy: originalText.endIndex),
+               startIndex < endIndex {
                 targetWord = String(originalText[startIndex..<endIndex])
             }
 
@@ -105,38 +105,6 @@ public final class NativeHarperBridge {
             }
         }
         return results
-    }
-
-    private func runHeuristicCheck(text: String) -> [LintSuggestion] {
-        let words = text.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }
-        guard let lastWord = words.last else { return [] }
-
-        let cleanWord = lastWord.lowercased().trimmingCharacters(in: .punctuationCharacters)
-        let commonTypos: [String: String] = [
-            "teh": "the",
-            "recieve": "receive",
-            "seperate": "separate",
-            "untill": "until",
-            "definately": "definitely",
-            "occured": "occurred",
-            "accomodate": "accommodate",
-            "writting": "writing",
-            "realy": "really",
-            "becuase": "because"
-        ]
-
-        if let fix = commonTypos[cleanWord] {
-            return [
-                LintSuggestion(
-                    start: text.count - cleanWord.count,
-                    end: text.count,
-                    targetWord: cleanWord,
-                    message: "Spelling correction",
-                    replacements: [fix]
-                )
-            ]
-        }
-        return []
     }
 }
 

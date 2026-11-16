@@ -4,26 +4,36 @@ Appendix is designed from the ground up to run Small Language Models (SLMs) comp
 
 ## Privacy & Security Guarantee
 
-- **Zero Cloud Calls**: Models execute strictly on local CPU / GPU hardware.
+- **Zero Cloud Calls**: Models execute strictly on local CPU hardware via the pure-Rust Hugging Face `candle` inference engine.
 - **No Analytics / Telemetry**: Prompt text never leaves your device.
 - **Open-Weights**: All recommended models use the permissive Apache 2.0 license.
 
 ## Supported Format: GGUF
 
-Appendix uses the industry-standard **GGUF** format (`llama.cpp`), which enables fast quantized inference on standard consumer CPUs without requiring discrete high-end GPUs.
+Appendix uses quantized **GGUF** models, enabling fast inference on standard consumer CPUs without requiring discrete GPUs.
 
-## Available Model Profiles
+## Recommended Model: Qwen 2.5 0.5B Instruct (Q4_K_M)
 
-| Model | Parameters | Quantization | Size | Minimum RAM | Target Hardware |
-|---|---|---|---|---|---|
-| **Qwen 2.5 0.5B Instruct** | 0.49B | `Q4_K_M` | ~380 MB | 800 MB | Mobile, Laptops, Low-spec PCs |
-| **Qwen 2.5 1.5B Instruct** | 1.54B | `Q4_K_M` | ~940 MB | 1.8 GB | Standard Desktop, Fast Rewriting |
-| **Qwen 2.5 3B Instruct** | 3.09B | `Q4_K_M` | ~1.85 GB | 3.5 GB | High-spec Desktop (8GB+ RAM) |
+- **Model File**: `qwen2.5-0.5b-instruct-q4_k_m.gguf` (491,400,032 bytes)
+- **SHA-256**: `74a4da8c9fdbcd15bd1f6d01d621410d31c6fc00986f5eb687824e7b93d7a9db`
+- **Tokenizer**: `tokenizer.json` (7,031,645 bytes)
+- **SHA-256**: `c0382117ea329cdf097041132f6d735924b697924d6f6fc3945713e96ce87539`
+- **RAM Requirement**: ~800 MB active footprint
+- **Speed**: ~5.8 to ~7.5 tokens/sec on modern 8-core CPU
 
-## Manual Model Installation
+## Manual Installation Guide
 
-If you prefer to download the model file yourself:
-1. Download any `.gguf` file from the [Qwen HuggingFace repository](https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF).
-2. Place the file inside the `models/` directory or import it directly inside the Appendix application settings.
-3. The app will immediately detect the local file and switch to on-device AI inference.
+To install the model manually:
 
+1. Download the quantized model from Hugging Face:
+   ```bash
+   curl -L -o models/qwen2.5-0.5b-instruct-q4_k_m.gguf \
+     https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf
+   ```
+2. Download the official tokenizer:
+   ```bash
+   curl -L -o models/tokenizer.json \
+     https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct/raw/main/tokenizer.json
+   ```
+3. Place both files in the `models/` directory of the application.
+4. Launch Appendix. The application will detect the model automatically and activate the green **Neural AI** indicator.

@@ -1,214 +1,193 @@
-# Appendix — Open-Source Offline English Writing Assistant
+# Appendix
 
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Android%20%7C%20macOS%20%7C%20iOS-green.svg)]()
-[![Privacy](https://img.shields.io/badge/Privacy-100%25%20Offline-brightgreen.svg)](PRIVACY_AUDIT.md)
-[![Rust](https://img.shields.io/badge/Rust-1.80+-orange.svg)]()
-[![Flutter](https://img.shields.io/badge/Flutter-3.50.0-02569B.svg)]()
+**An offline-first English writing assistant for Windows and macOS, with native mobile keyboards for Android and iOS.**
 
-**Appendix** is an open-source, 100% offline, privacy-first English writing assistant and system-wide keyboard. Inspired by the capabilities of Grammarly and QuillBot, Appendix offers an independent, autonomous alternative: zero cloud dependencies, zero subscription paywalls, zero telemetry, and zero tracking.
+[![CI](https://github.com/tracolerd/appendix/actions/workflows/ci.yml/badge.svg?branch=feat/local-ai-inference)](https://github.com/tracolerd/appendix/actions/workflows/ci.yml?query=branch%3Afeat%2Flocal-ai-inference)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
+[![Flutter](https://img.shields.io/badge/Flutter-3.50.0-02569B.svg)](https://flutter.dev/)
+[![Core](https://img.shields.io/badge/Core-Rust-orange.svg)](https://www.rust-lang.org/)
 
-Every keystroke, grammar check, readability score, and AI rephrase happens entirely on your local CPU / GPU inside your device's memory.
+Appendix is a local writing workspace built with Flutter and a Rust language engine. It combines grammar and spelling checks, writing insights, draft history, optional local-model rewriting, and mobile system keyboards. It is an independent open-source project and is not affiliated with Grammarly or QuillBot.
 
----
-
-## 🌟 Key Capabilities
-
-### 1. Real-time Offline Grammar & Spell Checking
-- Powered by **Harper Core 3.2.0** compiled in Rust.
-- Sub-millisecond latency (`<10ms`).
-- Deep syntactic, stylistic, and spelling analysis.
-- Dual-dialect support: **American English (US)** and **British English (UK)** with instantaneous switching.
-
-### 2. 12 Offline Writing & Rephrasing Styles
-- Rephrase & Polish
-- Make Professional
-- Make Academic
-- Make Formal
-- Make Casual
-- Make Concise
-- Expand Content
-- Improve Clarity
-- Improve Vocabulary
-- Simplify
-- Active to Passive Voice
-- Passive to Active Voice
-- Supported by Qwen 2.5 series local SLMs (0.5B, 1.5B, 3B GGUF) and built-in offline rule-based heuristic fallback engines.
-
-### 3. Deep Writing Insights & Readability Analytics
-- **Flesch Reading Ease** gauge (0–100 scale).
-- **Flesch-Kincaid Grade Level** estimator.
-- **Type-Token Ratio (TTR)** vocabulary diversity tracker.
-- **Overused Words Detector** highlighting redundancy.
-- Sentence length distribution analysis.
-
-### 4. Local SQLite Draft History
-- Automatic local snapshots stored in private SQLite database (`history.db`).
-- Instant restore, word count tracking, readability archiving, and one-click database clearing.
-- Never synced to any cloud.
-
-### 5. System-Wide Mobile Keyboards (Android & iOS)
-- **Android Keyboard (IME)**: Native Kotlin `InputMethodService` with real-time candidate strip suggestions, one-tap replacements, full QWERTY/symbols layout, and tactile haptic feedback.
-- **iOS Keyboard Extension**: Native Swift `UIInputViewController` strictly isolated with `RequestsOpenAccess = false` (Apple kernel-enforced offline isolation). Includes mandatory Globe key for seamless switching.
+> **Early testing release.** The desktop and Android packages are intended for hands-on evaluation. Read each platform's signing notes before installing.
 
 ---
 
-## 🏗️ Architecture
+## Download Appendix
 
-```mermaid
-graph TD
-    subgraph Client Application Layer
-        UI["Flutter Cross-Platform UI<br/>(Editor, Sidebar, Toolbar, AI Panel, Insights)"]
-        AKB["Android Native Keyboard<br/>(Kotlin InputMethodService)"]
-        IKB["iOS Native Keyboard<br/>(Swift UIInputViewController)"]
-    end
+These are direct links to the latest GitHub Release assets.
 
-    subgraph Interop & Bridge Layer
-        FFI["Dart FFI (C ABI)"]
-        JNI["JNI Bridge (Java Native Interface)"]
-        SWIFT_C["C-Bridging Header (Swift C ABI)"]
-    end
+| Platform | Direct download | Package |
+|---|---|---|
+| **Windows 10/11 (x64)** | [Download Appendix for Windows](https://github.com/tracolerd/appendix/releases/latest/download/appendix-windows-x64.zip) | Portable ZIP with Flutter desktop app and Rust DLL |
+| **macOS (Universal)** | [Download Appendix for macOS](https://github.com/tracolerd/appendix/releases/latest/download/appendix-macos.zip) | App ZIP for Apple Silicon and Intel Macs |
+| **Android (64-bit)** | [Download Appendix APK](https://github.com/tracolerd/appendix/releases/latest/download/appendix-android.apk) | Debug-signed APK for sideloading and evaluation |
+| Android developers | [Download Android App Bundle](https://github.com/tracolerd/appendix/releases/latest/download/appendix-android.aab) | Debug-signed AAB for internal evaluation; not Play Store ready |
 
-    subgraph Core Engine Layer (Rust appendix_core)
-        HARPER["Harper 3.2.0 Grammar Engine<br/>(Curated FST Dictionary & Linters)"]
-        INSIGHTS["Readability & Insights Engine<br/>(Flesch, Syllable Counter, TTR)"]
-        REPHRASE["Local AI & Heuristic Rephraser<br/>(Qwen 2.5 ChatML + Offline Rules)"]
-        SQLITE["Embedded SQLite Storage<br/>(Draft Snapshots & Metrics)"]
-    end
+The direct download URLs resolve after a tagged GitHub Release has published its assets. Until then, check the [Releases page](https://github.com/tracolerd/appendix/releases) for availability.
 
-    UI --> FFI
-    AKB --> JNI
-    IKB --> SWIFT_C
+**Checksums:** [SHA256SUMS.txt](https://github.com/tracolerd/appendix/releases/latest/download/SHA256SUMS.txt) contains SHA-256 hashes for the release packages. Verify a downloaded file before installing it.
 
-    FFI --> HARPER
-    FFI --> INSIGHTS
-    FFI --> REPHRASE
-    FFI --> SQLITE
+**All releases:** [GitHub Releases](https://github.com/tracolerd/appendix/releases)
 
-    JNI --> HARPER
-    JNI --> INSIGHTS
-    JNI --> REPHRASE
+### Installation guides
 
-    SWIFT_C --> HARPER
-```
+- [Windows installation](INSTALL_WINDOWS.md)
+- [macOS installation](INSTALL_MACOS.md)
+- [Android installation and keyboard activation](INSTALL_ANDROID.md)
+- [iOS developer build and simulator status](INSTALL_IOS.md)
+
+### Signing and distribution notes
+
+- **Windows:** The portable package is not code-signed. Windows SmartScreen may show an unknown-publisher warning.
+- **macOS:** The app is not Developer ID signed or notarized. Gatekeeper may require the user to approve opening it.
+- **Android:** The APK is debug-signed for sideloading and device testing. It is **not** a production Play Store release. An update signed with a different debug key may require uninstalling the earlier build first.
+- **iOS:** The repository includes the iOS app and Swift keyboard-extension source. The app and keyboard were built and manually exercised in an iOS Simulator. Physical-device signing, provisioning, a signed IPA, App Store archive, review, and publication have **not** been completed. There is no iOS App Store download in this release.
 
 ---
 
-## 📂 Repository Structure
+## What Appendix does
 
-```
-Project Typing App/
-├── app/                              # Flutter Cross-Platform Application
-│   ├── android/                      # Android project & Native Kotlin IME Keyboard
-│   │   └── app/src/main/
-│   │       ├── kotlin/.../keyboard/  # AppendixInputMethodService & NativeEngine
-│   │       ├── jniLibs/              # Compiled arm64-v8a and x86_64 .so binaries
-│   │       └── res/xml/method.xml    # IME subtypes definition
-│   ├── ios/                          # iOS project & Swift Keyboard Extension
-│   │   ├── AppendixKeyboard/         # KeyboardViewController & NativeHarperBridge
-│   │   └── Runner/AppDelegate.swift  # App Group preferences synchronization
-│   ├── macos/                        # macOS Desktop runner & entitlements
-│   ├── windows/                      # Windows Desktop runner
-│   ├── lib/                          # Flutter Dart UI & Business Logic
-│   │   ├── core/ffi/                 # Native grammar engine & C-ABI bindings
-│   │   └── features/                 # Editor, AI Assistant, Insights, History, Keyboard Setup
-│   └── test/                         # Comprehensive Flutter widget & unit test suite
-├── rust/                             # Core Rust Engine crate (appendix_core)
-│   ├── src/
-│   │   ├── lib.rs                    # C ABI exports & dialect management
-│   │   ├── jni_bridge.rs             # High-performance JNI methods for Android
-│   │   ├── insights.rs               # Readability & vocabulary analytics
-│   │   ├── ai_rephrase.rs            # 12 rewriting styles & Qwen ChatML formatting
-│   │   └── history.rs                # SQLite local snapshot storage
-│   └── Cargo.toml                    # harper-core, rusqlite, jni, serde
-├── include/                          # Public C Header (appendix_core.h)
-├── models/                           # GGUF manifest & local SLM specifications
-├── scripts/                          # Packaging & build scripts (Apple, Windows)
-├── .github/workflows/                # Automated CI/CD & Multi-Platform Release workflows
-├── LICENSE                           # Apache-2.0 License
-├── PRIVACY_AUDIT.md                  # Comprehensive Zero-Telemetry Audit Report
-└── README.md                         # Master Documentation
-```
+### Grammar and spelling
+
+- Rust-based grammar and spelling engine using Harper Core.
+- American English and British English dialect selection.
+- Native C ABI used by the Flutter app, with JNI for Android and a Swift bridge for the iOS keyboard.
+
+### Writing insights
+
+- Flesch Reading Ease and Flesch-Kincaid grade-level estimates.
+- Vocabulary-diversity and repeated-word indicators.
+- Sentence-length and readability feedback.
+
+These are writing aids and estimates, not professional editorial or academic assessments.
+
+### Rewriting and local AI
+
+- Multiple rewrite styles are available in the app.
+- Built-in heuristic rewriting works locally.
+- Optional Qwen 2.5 0.5B Instruct GGUF inference can be enabled by importing the model. The model is not bundled in the app packages and must be obtained separately.
+- If the optional model is not installed or initialized, model-powered rewriting is unavailable; heuristic options remain available.
+
+[Model manifest and download details](models/model_manifest.json)
+
+### Mobile keyboards
+
+- **Android:** Native Kotlin InputMethodService keyboard with the Rust engine bridged through JNI.
+- **iOS:** Native Swift keyboard extension. Its current configuration sets RequestsOpenAccess to false. The keyboard has been tested in the iOS Simulator, not on a provisioned physical iPhone.
 
 ---
 
-## 🚀 Building & Running
+## Platform status
 
-### 1. Prerequisites
-- **Rust**: `1.80+` (via `rustup`)
-- **Flutter**: `3.50+` (Dart `3.14+`)
-- **Android SDK & NDK**: NDK 27+ (for Android builds)
-- **Xcode 15+**: (for macOS & iOS builds)
+| Platform | Source | Build and test evidence | Distribution status |
+|---|---|---|---|
+| Windows | Flutter desktop + Rust DLL | Windows build is defined in the release workflow; verify the current Release asset before installing | Portable ZIP, unsigned |
+| macOS | Flutter desktop + universal Rust dylib | Release app built and launched on an Apple Silicon Mac; grammar-check smoke test passed | Universal ZIP, not notarized |
+| Android | Flutter app + Rust JNI libraries + Kotlin keyboard | Android build validation is part of CI; release APK uses debug signing | APK sideload only |
+| iOS | Flutter app + XCFramework + Swift keyboard | Simulator build and manual keyboard test passed | No public IPA; device signing and App Store work pending |
 
----
-
-### 2. Building the Rust Core Engine
-```bash
-cd rust
-
-# Build release dynamic library (Windows DLL / Linux SO / macOS dylib)
-cargo build --release
-
-# Run unit tests
-cargo test
-```
+The iOS source is present and simulator-tested, but it is inaccurate to describe it as App Store-ready. Physical-device signing, provisioning, device validation, archive generation, App Store review, and release remain separate tasks.
 
 ---
 
-### 3. Running the Flutter Desktop Application
-```bash
-cd app
+## Privacy and offline design
 
-# Fetch dependencies
-flutter pub get
+Appendix is designed to process writing locally and does not require an account or a hosted writing service for its core workflows. The grammar engine, writing insights, SQLite draft history, heuristic rewriting, and optional imported-model inference run on the device.
 
-# Run tests
-flutter test
+Platform-level implementation details:
 
-# Run app on your connected device or desktop
-flutter run -d windows    # On Windows
-flutter run -d macos      # On macOS
-```
+- **Android:** The app manifest does not declare the Android INTERNET permission. It declares vibration permission for haptics and the OS-protected input-method service.
+- **iOS keyboard:** The extension plist sets RequestsOpenAccess to false. This is a property of the keyboard extension, not proof that every possible host-app behavior has been independently security-tested.
+- **macOS:** The release entitlement enables App Sandbox and does not include the network-client entitlement.
+- **Local model:** Model weights are obtained separately by the user and stored locally; they are not included in the platform installers.
+
+See [Privacy implementation notes](PRIVACY_AUDIT.md). This is a project-level source and configuration review, not an independent penetration test or third-party certification.
 
 ---
 
-### 4. Compiling for Android & Building the APK
-```bash
-# 1. Compile Rust shared libraries for Android targets
-cd rust
-cargo ndk -t arm64-v8a -t x86_64 -o ../app/android/app/src/main/jniLibs build --release
+## Technology
 
-# 2. Build the Android APK
-cd ../app
-flutter build apk --release
-```
-The resulting APK is generated at:  
-`app/build/app/outputs/flutter-apk/app-release.apk`
+| Layer | Technology |
+|---|---|
+| Application UI | Flutter 3.50 / Dart |
+| Core engine | Rust |
+| Grammar and spelling | Harper Core |
+| Native integration | Dart FFI, Android JNI, Swift C bridge |
+| Local storage | SQLite |
+| Android keyboard | Kotlin InputMethodService |
+| iOS keyboard | Swift UIInputViewController |
+| Optional local model | Candle / GGUF / Tokenizers |
+
+## Build from source
+
+### Prerequisites
+
+- Rust stable toolchain
+- Flutter 3.50.0 and the matching Dart SDK
+- Android SDK and NDK for Android builds
+- Xcode for macOS and iOS builds
+- Visual Studio 2022 with Desktop development with C++ for Windows desktop builds
+
+### Flutter setup and tests
+
+    cd app
+    flutter pub get
+    flutter analyze
+    flutter test
+
+### Windows
+
+Build the Rust DLL for the Windows MSVC target and place it beside the Flutter runner as described in [INSTALL_WINDOWS.md](INSTALL_WINDOWS.md), then run:
+
+    cd app
+    flutter build windows --release
+
+### Android
+
+Build the Rust JNI libraries for the required Android ABIs, then run:
+
+    cd app
+    flutter build apk --release
+
+See [INSTALL_ANDROID.md](INSTALL_ANDROID.md) for the complete native build and keyboard steps.
+
+### macOS and iOS
+
+From the repository root:
+
+    chmod +x scripts/build_apple.sh
+    ./scripts/build_apple.sh
+
+Then build the macOS app:
+
+    cd app
+    flutter pub get
+    flutter build macos --release
+
+The Apple build script creates the universal macOS Rust dylib and the iOS XCFramework. iOS device installation additionally requires Apple signing and provisioning; see [INSTALL_IOS.md](INSTALL_IOS.md).
 
 ---
 
-### 5. Compiling for macOS & iOS (Apple Platforms)
-```bash
-# Run the automated Apple build script
-chmod +x scripts/build_apple.sh
-./scripts/build_apple.sh
-```
-This script automatically compiles:
-- `libappendix_core.dylib`: macOS Universal Binary (`arm64` + `x86_64` via `lipo`).
-- `AppendixCore.xcframework`: iOS Multi-architecture XCFramework (`arm64-ios` + `sim-universal`).
+## Repository layout
 
----
+    app/                    Flutter application and platform projects
+      android/              Android app and Kotlin keyboard
+      ios/                  iOS app and Swift keyboard extension
+      macos/                macOS desktop runner
+      windows/              Windows desktop runner
+      lib/                  Dart UI and application logic
+      test/                 Flutter tests
+    rust/                   Rust core engine and native bridges
+    include/                Public C ABI header
+    models/                 Local-model manifest and setup information
+    scripts/                Native build scripts
+    .github/workflows/      CI and release automation
 
-## 🔒 Zero-Telemetry & Privacy Guarantee
+## Contributing and issue reports
 
-Appendix takes privacy seriously:
-1. **No Network Access**: The Android manifest does **not** request `android.permission.INTERNET`. The iOS keyboard specifies `<key>RequestsOpenAccess</key><false/>`.
-2. **Zero Third-Party SDKs**: No Google Analytics, Firebase, Mixpanel, Sentry, or tracking beacons.
-3. **Local Storage Only**: Your drafts are stored strictly on your local disk in SQLite.
-4. For complete verification details, read our certified [PRIVACY_AUDIT.md](PRIVACY_AUDIT.md).
+Bug reports, reproducible steps, platform details, and sanitized logs are welcome through [GitHub Issues](https://github.com/tracolerd/appendix/issues). Do not include private documents or sensitive text in bug reports.
 
----
+## License
 
-## 📄 License
-
-Appendix is licensed under the **Apache License, Version 2.0**. You are free to inspect, modify, distribute, and embed this software freely without subscription fees or closed-source restrictions. See the [LICENSE](LICENSE) file for complete details.
+Appendix is distributed under the [Apache License 2.0](LICENSE). Third-party notices and component licensing details are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

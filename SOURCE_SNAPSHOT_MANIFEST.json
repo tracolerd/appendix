@@ -1,0 +1,199 @@
+{
+  "schema_version": "1.0.0",
+  "base_commit": "6394fb3c8f41a051be062b0460225f465626c110",
+  "branch": "feat/local-ai-inference",
+  "working_tree_status": "DIRTY_UNCOMMITTED_CHANGES_PRESENT",
+  "source_snapshot_fingerprint": "6792a8e7b9baf9c9fca64e4cf1d185554d4d756fc94a3ae4f622cc9e4a67a389",
+  "total_modified_tracked_files": 19,
+  "total_untracked_source_files": 18,
+  "modified_tracked_files": [
+    {
+      "path": ".github/workflows/release.yml",
+      "sha256": "7d5e8ec549922701a498af4fb8d601858974c250a02cc1149a2b0b699c846d42",
+      "size_bytes": 9083
+    },
+    {
+      "path": ".gitignore",
+      "sha256": "aeb750912b59f906789736b726448cacc234c832cf8d82c4b6f2f93419b8bb5b",
+      "size_bytes": 1515
+    },
+    {
+      "path": "README.md",
+      "sha256": "503604bca7e6cd0f4f823a458b6661538749defa4af3c87d92b0a87a9b54a9d0",
+      "size_bytes": 11459
+    },
+    {
+      "path": "app/android/app/build.gradle.kts",
+      "sha256": "01b762829e0616e891bd2711dfa0c0b01206e91adfd0c638c0aaba518f749dee",
+      "size_bytes": 2592
+    },
+    {
+      "path": "app/android/app/src/main/kotlin/org/appendix/appendix/keyboard/AppendixInputMethodService.kt",
+      "sha256": "336ca1c43ad103bbe74b09265aef190a1f62ca479adb3a400640de40b3bd7f7e",
+      "size_bytes": 25160
+    },
+    {
+      "path": "app/ios/AppendixKeyboard/KeyboardViewController.swift",
+      "sha256": "c7a58a6b71388fb52f697533a18b5086418fbb5df83327c6d9b88e0903411513",
+      "size_bytes": 18993
+    },
+    {
+      "path": "app/ios/AppendixKeyboard/NativeHarperBridge.swift",
+      "sha256": "9747806f1aa6666e4fbb0f0bcf7fda4c501b40e34fc46e262d2ddc1432a31864",
+      "size_bytes": 3502
+    },
+    {
+      "path": "app/ios/Runner.xcodeproj/project.pbxproj",
+      "sha256": "2b239cd75ba5df7cfe7ad6a19da54d8b06ae89507a2a4020a842252bbcd503d9",
+      "size_bytes": 34014
+    },
+    {
+      "path": "app/ios/Runner/AppDelegate.swift",
+      "sha256": "872a0636c3fb8b9d622103e6cf211beb6d4859d0f7e4ae19d1120048dbf12b99",
+      "size_bytes": 2325
+    },
+    {
+      "path": "app/lib/features/ai_assistant/ai_panel.dart",
+      "sha256": "67259e009d095b0d3bf4b9e74bac201564ac4d6e182142d90eef25c0997a93cd",
+      "size_bytes": 18477
+    },
+    {
+      "path": "app/lib/features/keyboard_settings/keyboard_settings_screen.dart",
+      "sha256": "182f5e185532794d187a16d4cdf367436b259d44940d1a9866c3a9c4ce5f75ac",
+      "size_bytes": 19980
+    },
+    {
+      "path": "app/test/keyboard_settings_test.dart",
+      "sha256": "a25cfc8bca476b15d3f83d2e32005c9dc39e234030cd33a5fe74a59ee136a5b2",
+      "size_bytes": 2720
+    },
+    {
+      "path": "app/test/phase2_features_test.dart",
+      "sha256": "35ac79882929488f1feb4dee67cbb9eaa858e6b432541b0a82d9f683fc4e3657",
+      "size_bytes": 3318
+    },
+    {
+      "path": "rust/src/ai_engine.rs",
+      "sha256": "6d90c9b890eef1955ef387c10868c4d98c98608ebeec3913c6b9a37fdebb0d1b",
+      "size_bytes": 29260
+    },
+    {
+      "path": "rust/src/ai_rephrase.rs",
+      "sha256": "464fecc23a7ad9aaf8f320713f932b6ecd2c51bf0e441f85e3fecb28780eef2a",
+      "size_bytes": 14901
+    },
+    {
+      "path": "rust/src/history.rs",
+      "sha256": "a1e286e82377ad55d799aea941e64961118f7f9fad5c34cbc8ace66065b81f0e",
+      "size_bytes": 4291
+    },
+    {
+      "path": "rust/src/insights.rs",
+      "sha256": "097b6bb85b15fdd830a9041a3dcccdda9e9cb9878004e8743639cd3f58697077",
+      "size_bytes": 8409
+    },
+    {
+      "path": "rust/src/lib.rs",
+      "sha256": "c844aeaa5dd9f0c2e2cf4dde53d848c9120a52a0140fe342b73d87e95f23a44a",
+      "size_bytes": 14129
+    },
+    {
+      "path": "rust/tests/test_ai_inference.rs",
+      "sha256": "8b93c381e90a592997ffc0d92b3f51e9815f9ae274fc5d53a14e3b81c4c03f6c",
+      "size_bytes": 14723
+    }
+  ],
+  "untracked_source_files": [
+    {
+      "path": "INSTALL_ANDROID.md",
+      "sha256": "e17fc270988e0c5a6c22fad7e89f0f7fdc187845d8c9c1d6794a435359d379a5",
+      "size_bytes": 5993
+    },
+    {
+      "path": "INSTALL_IOS.md",
+      "sha256": "38ea9c004d6e1a4e8c56e81b0af32be4ccc18875cb5d57333134bf3752f15afe",
+      "size_bytes": 4776
+    },
+    {
+      "path": "INSTALL_MACOS.md",
+      "sha256": "d2f3c03a5ddafa65836efcc0551a8f9fa6d0724a382afbe8f5dcfe481b36668b",
+      "size_bytes": 3809
+    },
+    {
+      "path": "INSTALL_WINDOWS.md",
+      "sha256": "5b55cdf4194dad5feac2bc4fe6ce851f9f70b07161ce6464ff3312a7edd5a13a",
+      "size_bytes": 5411
+    },
+    {
+      "path": "PHASE_6_1_FINAL_REPORT.md",
+      "sha256": "ade150eae77629181a147a52a8dbe840b66d2fb5a41f281d44efdb01877a9bd8",
+      "size_bytes": 23724
+    },
+    {
+      "path": "PHASE_6_1_VERIFICATION_REPORT.md",
+      "sha256": "3f31a91a4f982a7f216938810f41e9ac78ac8d0d54d1c5ab3c2d8ea3a054e479",
+      "size_bytes": 20905
+    },
+    {
+      "path": "PHASE_7_1_CLOSURE_REPORT.md",
+      "sha256": "175bb39be6cc75e542cf58cc9ad3e3268811c5e4675a5bafd4726a1ae44fcf78",
+      "size_bytes": 17740
+    },
+    {
+      "path": "PHASE_7_FINAL_REPORT.md",
+      "sha256": "18bfb1abc48fb83f9ff01cf7068f9b24c8921c6b8d0f877a022b4b518925dfd3",
+      "size_bytes": 22779
+    },
+    {
+      "path": "PHASE_8_FINAL_REPORT.md",
+      "sha256": "92910ea60263aa80e0d323dbe7f544bcf128ed573e8e19e3cb0e70f08e2d0174",
+      "size_bytes": 16937
+    },
+    {
+      "path": "PLATFORM_SUPPORT_MATRIX.md",
+      "sha256": "65dbf6efe326cd42e6dcab3ab8bccb235a5d8b2093ef2f290d240b2aee395401",
+      "size_bytes": 9179
+    },
+    {
+      "path": "RELEASE_READINESS_MATRIX.md",
+      "sha256": "8196b891c72ba2d8ac51c9504f6720912f77148b24df9082b66b8882cab35714",
+      "size_bytes": 7568
+    },
+    {
+      "path": "SOURCE_SNAPSHOT_MANIFEST.json",
+      "sha256": "8fd3ab6177206a36492c41b25f051586bd6f52923417fccbdf949446998b699a",
+      "size_bytes": 7148
+    },
+    {
+      "path": "THIRD_PARTY_NOTICES.md",
+      "sha256": "288ded62a2243c0a486ea6d95442b77c3bbd6be7c141c8e57940d4a01d707fca",
+      "size_bytes": 10379
+    },
+    {
+      "path": "app/test/mobile_keyboard_integration_test.dart",
+      "sha256": "2fcd33c9002597e4c2f0d892170ab7d48135a2534617756ca978669ef9bf31db",
+      "size_bytes": 5553
+    },
+    {
+      "path": "scripts/audit_licenses.py",
+      "sha256": "5f0fba6cc6dd159f25574401c5a8e21021b4ea11d0f69fe31900f35bceaec3f5",
+      "size_bytes": 1807
+    },
+    {
+      "path": "scripts/generate_source_manifest.py",
+      "sha256": "60f5d3026febbc8f12a91b8bbbf1ecaa599c99c2dde1c246baaffdbd87908484",
+      "size_bytes": 3316
+    },
+    {
+      "path": "scripts/validate_workflows.py",
+      "sha256": "e6fdf3ff8844e7fc4d4f86affdc1d76370e9f1fa90dabcc88622d1965a883753",
+      "size_bytes": 936
+    },
+    {
+      "path": "scripts/verify_release.py",
+      "sha256": "4a899383ed2f1469970a4336cae56f51db72a81bec54e2203553e555ec1e9e1a",
+      "size_bytes": 6187
+    }
+  ],
+  "notes": "This snapshot records the exact source code state used for Phase 8/8.1 release candidate validation builds. Artifacts were built against this dirty working tree, NOT from a clean git commit."
+}

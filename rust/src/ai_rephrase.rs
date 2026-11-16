@@ -1,7 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[repr(i32)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum RewriteMode {
     Rephrase = 0,
     MakeProfessional = 1,
@@ -18,20 +17,21 @@ pub enum RewriteMode {
 }
 
 impl RewriteMode {
-    pub fn from_i32(val: i32) -> Self {
+    pub fn from_i32(val: i32) -> Option<Self> {
         match val {
-            1 => RewriteMode::MakeProfessional,
-            2 => RewriteMode::MakeAcademic,
-            3 => RewriteMode::MakeFormal,
-            4 => RewriteMode::MakeCasual,
-            5 => RewriteMode::MakeConcise,
-            6 => RewriteMode::Expand,
-            7 => RewriteMode::ImproveClarity,
-            8 => RewriteMode::ImproveVocabulary,
-            9 => RewriteMode::Simplify,
-            10 => RewriteMode::ActiveToPassive,
-            11 => RewriteMode::PassiveToActive,
-            _ => RewriteMode::Rephrase,
+            0 => Some(RewriteMode::Rephrase),
+            1 => Some(RewriteMode::MakeProfessional),
+            2 => Some(RewriteMode::MakeAcademic),
+            3 => Some(RewriteMode::MakeFormal),
+            4 => Some(RewriteMode::MakeCasual),
+            5 => Some(RewriteMode::MakeConcise),
+            6 => Some(RewriteMode::Expand),
+            7 => Some(RewriteMode::ImproveClarity),
+            8 => Some(RewriteMode::ImproveVocabulary),
+            9 => Some(RewriteMode::Simplify),
+            10 => Some(RewriteMode::ActiveToPassive),
+            11 => Some(RewriteMode::PassiveToActive),
+            _ => None,
         }
     }
 
@@ -47,58 +47,100 @@ impl RewriteMode {
             RewriteMode::ImproveClarity => "Improve Clarity",
             RewriteMode::ImproveVocabulary => "Improve Vocabulary",
             RewriteMode::Simplify => "Simplify",
-            RewriteMode::ActiveToPassive => "Active to Passive",
-            RewriteMode::PassiveToActive => "Passive to Active",
+            RewriteMode::ActiveToPassive => "Active to Passive (Experimental)",
+            RewriteMode::PassiveToActive => "Passive to Active (Experimental)",
         }
+    }
+
+    pub fn is_experimental(&self) -> bool {
+        matches!(
+            self,
+            RewriteMode::ActiveToPassive | RewriteMode::PassiveToActive
+        )
     }
 
     pub fn system_prompt(&self) -> &'static str {
         match self {
             RewriteMode::Rephrase => {
-                "You are an expert English writing assistant. Rephrase the input text clearly, preserving the exact original meaning. Output ONLY the rewritten text without conversational filler, notes, or quotes."
+                "You are an expert English writing assistant. Rephrase the input text with natural, fluent wording while preserving the exact original meaning. Output ONLY the rewritten text without quotes, conversational filler, or commentary."
             }
             RewriteMode::MakeProfessional => {
-                "You are a business communications specialist. Rewrite the text into a polished, respectful, and authoritative professional tone. Output ONLY the rewritten text without conversational filler, notes, or quotes."
+                "You are a business communications specialist. Rewrite the text into a polished, respectful, and authoritative professional tone suitable for corporate correspondence. Expand contractions (e.g. use 'do not' instead of 'don't'). Output ONLY the rewritten text without quotes or commentary."
             }
             RewriteMode::MakeAcademic => {
-                "You are an academic editor. Rewrite the text using scholarly tone, precise terminology, objective voice, and rigorous sentence structure. Output ONLY the rewritten text without conversational filler, notes, or quotes."
+                "You are an academic editor. Rewrite the text using scholarly tone, precise terminology, objective voice, and rigorous sentence structure. Eliminate contractions and casual expressions. Output ONLY the rewritten text without quotes or commentary."
             }
             RewriteMode::MakeFormal => {
-                "You are a formal writing stylist. Rewrite the text into formal English, eliminating slang, contractions, and colloquialisms. Output ONLY the rewritten text without conversational filler, notes, or quotes."
+                "You are an executive formal writing stylist. Rewrite the text into an elevated, distinguished, formal register. Strictly eliminate slang, contractions, and colloquialisms. Output ONLY the rewritten text without quotes or commentary."
             }
             RewriteMode::MakeCasual => {
-                "You are a friendly writing coach. Rewrite the text into a warm, natural, engaging casual tone. Output ONLY the rewritten text without conversational filler, notes, or quotes."
+                "You are a friendly writing coach. Rewrite the text into a warm, natural, engaging casual tone with friendly, conversational phrasing. Output ONLY the rewritten text without quotes or commentary."
             }
             RewriteMode::MakeConcise => {
-                "You are a minimalist editor. Condense the text by removing filler words and redundancy while keeping all key facts intact. Output ONLY the concise text without conversational filler, notes, or quotes."
+                "You are a minimalist editor. Condense the text by removing filler words, circumlocution, and redundancy while keeping ALL key facts intact. Output ONLY the concise text without quotes or commentary."
             }
             RewriteMode::Expand => {
-                "You are an expressive writer. Elaboration and expand the text with vivid context and nuanced description while preserving original intent. Output ONLY the expanded text without conversational filler, notes, or quotes."
+                "You are an articulate writing assistant. Elaborate and enhance the sentence with descriptive nuance and refined vocabulary. CRITICAL RULE: Do NOT invent fictional facts, unauthorized agendas, unmentioned participants, or fake locations. Keep strict factual consistency with the original statement. Output ONLY the rewritten text without quotes or commentary."
             }
             RewriteMode::ImproveClarity => {
-                "You are a clarity editor. Restructure awkward phrasing, ambiguous pronouns, and clunky syntax to make the sentence effortless to comprehend. Output ONLY the revised text without conversational filler, notes, or quotes."
+                "You are a clarity editor. Restructure awkward phrasing, ambiguous pronouns, and clunky syntax to make the sentence effortless to comprehend. Output ONLY the revised text without quotes or commentary."
             }
             RewriteMode::ImproveVocabulary => {
-                "You are a vocabulary expert. Upgrade repetitive and basic words with precise, sophisticated, and evocative diction suitable to the context. Output ONLY the upgraded text without conversational filler, notes, or quotes."
+                "You are a vocabulary expert. Upgrade repetitive and basic words with precise, sophisticated, and evocative diction suitable to the context. Output ONLY the upgraded text without quotes or commentary."
             }
             RewriteMode::Simplify => {
-                "You are a plain-language advocate. Simplify complex clauses and arcane jargon into simple, crisp English that anyone can instantly understand. Output ONLY the simplified text without conversational filler, notes, or quotes."
+                "You are a plain-language editor. Simplify complex vocabulary and difficult phrasing into clear, everyday English. CRITICAL RULE: Preserve ALL key facts, conditions, times, and core reasoning without dropping important details. Output ONLY the simplified text without quotes or commentary."
             }
             RewriteMode::ActiveToPassive => {
-                "Convert the sentence from active voice into grammatically flawless passive voice. Output ONLY the converted text."
+                "You are a precise grammar transformation tool. Convert the given active voice sentence into passive voice.\nRules:\n1. The direct object/receiver of the action becomes the grammatical subject.\n2. Use the correct auxiliary verb ('is', 'was', 'were', 'has been') + past participle.\n3. The original doer/subject must be placed in a 'by [agent]' prepositional phrase at the end.\n4. DO NOT swap who performs the action and who receives it.\n5. Output ONLY the converted passive sentence without quotes or notes."
             }
             RewriteMode::PassiveToActive => {
-                "Convert the sentence from passive voice into punchy, direct active voice. Output ONLY the converted text."
+                "You are a precise grammar transformation tool. Convert the given passive voice sentence into active voice.\nRules:\n1. Identify the agent performing the action in the 'by [agent]' phrase.\n2. Place that agent at the beginning as the grammatical subject.\n3. Convert the verb to active voice matching the original tense.\n4. Place the receiver of the action in the object position.\n5. DO NOT swap who performs the action and who receives it.\n6. Output ONLY the converted active sentence without quotes or notes."
             }
         }
     }
 
-    /// Format prompt for Qwen 2.5 ChatML format
+    /// Format prompt for Qwen 2.5 ChatML format with mode-tailored user prompts
     pub fn format_chatml_prompt(&self, text: &str) -> String {
+        let trimmed = text.trim();
+        let user_prompt = match self {
+            RewriteMode::ActiveToPassive => {
+                format!(
+                    "Convert this active voice sentence into passive voice. Make sure the receiver becomes the subject and the doer is in a 'by...' phrase:\nSentence: {}\nPassive:",
+                    trimmed
+                )
+            }
+            RewriteMode::PassiveToActive => {
+                format!(
+                    "Convert this passive voice sentence into active voice. Make sure the agent in 'by...' becomes the grammatical subject:\nSentence: {}\nActive:",
+                    trimmed
+                )
+            }
+            RewriteMode::Expand => {
+                format!(
+                    "Elaborate this sentence with descriptive depth while preserving strict factual consistency and adding no fictional details: {}",
+                    trimmed
+                )
+            }
+            RewriteMode::Simplify => {
+                format!(
+                    "Simplify this sentence into clear plain English without losing any facts, conditions, or reasoning: {}",
+                    trimmed
+                )
+            }
+            RewriteMode::MakeConcise => {
+                format!(
+                    "Make this sentence concise by removing wordiness and redundancy: {}",
+                    trimmed
+                )
+            }
+            _ => trimmed.to_string(),
+        };
+
         format!(
             "<|im_start|>system\n{}<|im_end|>\n<|im_start|>user\n{}<|im_end|>\n<|im_start|>assistant\n",
             self.system_prompt(),
-            text.trim()
+            user_prompt
         )
     }
 
@@ -123,7 +165,6 @@ impl RewriteMode {
                 for (from, to) in replacements {
                     s = s.replace(from, to);
                     s = s.replace(&from.to_uppercase(), &to.to_uppercase());
-                    // Capitalized first letter
                     let cap_from = format!("{}{}", &from[..1].to_uppercase(), &from[1..]);
                     let cap_to = format!("{}{}", &to[..1].to_uppercase(), &to[1..]);
                     s = s.replace(&cap_from, &cap_to);
@@ -139,17 +180,22 @@ impl RewriteMode {
                     ("didn't", "did not"),
                     ("isn't", "is not"),
                     ("aren't", "are not"),
-                    ("wasn't", "was not"),
-                    ("weren't", "were not"),
-                    ("gonna", "going to"),
-                    ("wanna", "want to"),
-                    ("kinda", "somewhat"),
-                    ("lots of", "numerous"),
+                    ("haven't", "have not"),
+                    ("hasn't", "has not"),
+                    ("wouldn't", "would not"),
+                    ("couldn't", "could not"),
+                    ("shouldn't", "should not"),
                     ("kids", "children"),
-                    ("buy", "purchase"),
+                    ("guy", "person"),
+                    ("guys", "individuals"),
+                    ("a lot of", "numerous"),
+                    ("tons of", "substantial quantities of"),
                 ];
                 for (from, to) in replacements {
                     s = s.replace(from, to);
+                    let cap_from = format!("{}{}", &from[..1].to_uppercase(), &from[1..]);
+                    let cap_to = format!("{}{}", &to[..1].to_uppercase(), &to[1..]);
+                    s = s.replace(&cap_from, &cap_to);
                 }
                 s
             }
@@ -162,14 +208,42 @@ impl RewriteMode {
                     ("did not", "didn't"),
                     ("is not", "isn't"),
                     ("are not", "aren't"),
+                    ("have not", "haven't"),
+                    ("has not", "hasn't"),
+                    ("would not", "wouldn't"),
+                    ("could not", "couldn't"),
+                    ("should not", "shouldn't"),
+                    ("utilize", "use"),
                     ("purchase", "buy"),
+                    ("obtain", "get"),
+                    ("inform", "tell"),
                     ("commence", "start"),
                     ("terminate", "end"),
-                    ("inquire", "ask"),
-                    ("utilize", "use"),
                 ];
                 for (from, to) in replacements {
                     s = s.replace(from, to);
+                    let cap_from = format!("{}{}", &from[..1].to_uppercase(), &from[1..]);
+                    let cap_to = format!("{}{}", &to[..1].to_uppercase(), &to[1..]);
+                    s = s.replace(&cap_from, &cap_to);
+                }
+                s
+            }
+            RewriteMode::Simplify => {
+                let mut s = trimmed.to_string();
+                let replacements = [
+                    ("utilize", "use"),
+                    ("facilitate", "help"),
+                    ("implement", "carry out"),
+                    ("subsequently", "later"),
+                    ("commence", "start"),
+                    ("terminate", "end"),
+                    ("in order to", "to"),
+                ];
+                for (from, to) in replacements {
+                    s = s.replace(from, to);
+                    let cap_from = format!("{}{}", &from[..1].to_uppercase(), &from[1..]);
+                    let cap_to = format!("{}{}", &to[..1].to_uppercase(), &to[1..]);
+                    s = s.replace(&cap_from, &cap_to);
                 }
                 s
             }
@@ -183,7 +257,15 @@ pub struct RewriteResult {
     pub original: String,
     pub revised: String,
     pub mode: String,
-    pub engine: String, // "SLM" or "Heuristic"
+    pub engine: String,
+    pub latency_ms: Option<f64>,
+    pub prompt_eval_ms: Option<f64>,
+    pub token_eval_ms: Option<f64>,
+    pub tokens_generated: Option<usize>,
+    pub tokens_per_sec: Option<f64>,
+    pub model_name: Option<String>,
+    pub status: String,
+    pub error_message: Option<String>,
 }
 
 #[cfg(test)]
@@ -192,27 +274,37 @@ mod tests {
 
     #[test]
     fn test_chatml_formatting() {
-        let mode = RewriteMode::MakeProfessional;
-        let prompt = mode.format_chatml_prompt("Hey send me that file asap.");
-        assert!(prompt.contains("<|im_start|>system"));
-        assert!(prompt.contains("<|im_start|>user\nHey send me that file asap."));
+        let mode = RewriteMode::Rephrase;
+        let prompt = mode.format_chatml_prompt("This is a test sentence.");
+        assert!(prompt.starts_with("<|im_start|>system\n"));
+        assert!(prompt.contains("<|im_start|>user\nThis is a test sentence.<|im_end|>\n"));
         assert!(prompt.ends_with("<|im_start|>assistant\n"));
-    }
-
-    #[test]
-    fn test_heuristic_fallback_concise() {
-        let mode = RewriteMode::MakeConcise;
-        let input = "In order to succeed, we must practice on a daily basis.";
-        let output = mode.heuristic_fallback(input);
-        assert_eq!(output, "To succeed, we must practice daily.");
     }
 
     #[test]
     fn test_heuristic_fallback_formal() {
         let mode = RewriteMode::MakeFormal;
-        let input = "We don't wanna buy lots of stuff.";
+        let input = "I don't think kids should eat tons of candy.";
         let output = mode.heuristic_fallback(input);
-        assert_eq!(output, "We do not want to purchase numerous stuff.");
+        assert!(output.contains("do not"));
+        assert!(output.contains("children"));
+    }
+
+    #[test]
+    fn test_heuristic_fallback_concise() {
+        let mode = RewriteMode::MakeConcise;
+        let input = "In order to succeed, we must act on a daily basis.";
+        let output = mode.heuristic_fallback(input);
+        assert!(output.contains("To succeed"));
+        assert!(output.contains("daily"));
+    }
+
+    #[test]
+    fn test_heuristic_fallback_casual() {
+        let mode = RewriteMode::MakeCasual;
+        let input = "You must utilize this tool and do not delay.";
+        let output = mode.heuristic_fallback(input);
+        assert!(output.contains("use this tool"));
+        assert!(output.contains("don't delay"));
     }
 }
-

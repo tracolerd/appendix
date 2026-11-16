@@ -1,0 +1,54 @@
+name: AI Model Integration Tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      model_source:
+        description: 'Model repository source'
+        required: true
+        default: 'https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf'
+
+jobs:
+  ai-neural-test:
+    name: Local Neural Inference Verification
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Create Models Directory
+        run: mkdir -p models
+
+      - name: Download Qwen 2.5 0.5B GGUF Model
+        shell: bash
+        run: |
+          curl -L -o models/qwen2.5-0.5b-instruct-q4_k_m.gguf \
+            "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf"
+
+      - name: Download Tokenizer
+        shell: bash
+        run: |
+          curl -L -o models/tokenizer.json \
+            "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct/raw/main/tokenizer.json"
+
+      - name: Verify Model SHA-256 Checksum
+        shell: bash
+        run: |
+          echo "Verifying model checksum..."
+          EXPECTED="74a4da8c9fdbcd15bd1f6d01d621410d31c6fc00986f5eb687824e7b93d7a9db"
+          ACTUAL=$(sha256sum models/qwen2.5-0.5b-instruct-q4_k_m.gguf | awk '{print $1}')
+          echo "Expected: $EXPECTED"
+          echo "Actual:   $ACTUAL"
+          if [ "$EXPECTED" != "$ACTUAL" ]; then
+            echo "ERROR: Model checksum mismatch!"
+            exit 1
+          fi
+
+      - name: Run Neural Inference Test Suite
+        working-directory: rust
+        run: cargo test --test test_ai_inference --release -- --nocapture --test-threads=1

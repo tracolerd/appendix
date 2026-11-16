@@ -1,3 +1,4 @@
+pub mod ai_engine;
 pub mod ai_rephrase;
 pub mod history;
 pub mod insights;
@@ -12,7 +13,8 @@ use harper_core::spell::FstDictionary;
 use harper_core::{Dialect, Document, Lrc};
 use serde::{Deserialize, Serialize};
 
-use ai_rephrase::{RewriteMode, RewriteResult};
+use ai_engine::AiEngine;
+use ai_rephrase::RewriteMode;
 use history::HistoryStorage;
 use insights::InsightsEngine;
 
@@ -191,6 +193,131 @@ pub extern "C" fn appendix_insights_analyze(text: *const c_char) -> *mut c_char 
 }
 
 #[no_mangle]
+pub extern "C" fn appendix_ai_load_model(
+    model_path: *const c_char,
+    tokenizer_path: *const c_char,
+    verify_checksum: i32,
+) -> *mut c_char {
+    if model_path.is_null() || tokenizer_path.is_null() {
+        return std::ptr::null_mut();
+    }
+
+    let m_str = match unsafe { CStr::from_ptr(model_path) }.to_str() {
+        Ok(s) => s,
+        Err(_) => return std::ptr::null_mut(),
+    };
+    let t_str = match unsafe { CStr::from_ptr(tokenizer_path) }.to_str() {
+        Ok(s) => s,
+        Err(_) => return std::ptr::null_mut(),
+    };
+
+    let do_verify = verify_checksum != 0;
+    let status = match AiEngine::load_model(m_str, t_str, do_verify) {
+        Ok(s) => s,
+        Err(e) => {
+            let err_json = serde_json::json!({
+                "loaded": false,
+                "error": e,
+            });
+            return CString::new(err_json.to_string())
+                .map(|c| c.into_raw())
+                .unwrap_or(std::ptr::null_mut());
+        }
+    };
+
+    match serde_json::to_string(&status) {
+        Ok(json_str) => match CString::new(json_str) {
+            Ok(c_string) => c_string.into_raw(),
+            Err(_) => std::ptr::null_mut(),
+        },
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn appendix_ai_cancel() {
+    AiEngine::cancel_inference();
+}
+
+#[no_mangle]
+pub extern "C" fn appendix_ai_verify_model(
+    file_path: *const c_char,
+    expected_sha256: *const c_char,
+) -> *mut c_char {
+    if file_path.is_null() {
+        return std::ptr::null_mut();
+    }
+
+    let path_str = match unsafe { CStr::from_ptr(file_path) }.to_str() {
+        Ok(s) => s,
+        Err(_) => return std::ptr::null_mut(),
+    };
+
+    let exp_str = if expected_sha256.is_null() {
+        ""
+    } else {
+        unsafe { CStr::from_ptr(expected_sha256) }
+            .to_str()
+            .unwrap_or("")
+    };
+
+    let path = std::path::Path::new(path_str);
+    let result = match crate::ai_engine::compute_file_sha256(path) {
+        Ok(computed) => {
+            let matches = if exp_str.is_empty() {
+                true
+            } else {
+                computed.eq_ignore_ascii_case(exp_str.trim())
+            };
+            serde_json::json!({
+                "success": true,
+                "valid": matches,
+                "computed_sha256": computed,
+                "expected_sha256": exp_str,
+                "error": serde_json::Value::Null,
+            })
+        }
+        Err(e) => {
+            serde_json::json!({
+                "success": false,
+                "valid": false,
+                "computed_sha256": serde_json::Value::Null,
+                "expected_sha256": exp_str,
+                "error": e,
+            })
+        }
+    };
+
+    match serde_json::to_string(&result) {
+        Ok(json_str) => match CString::new(json_str) {
+            Ok(c_string) => c_string.into_raw(),
+            Err(_) => std::ptr::null_mut(),
+        },
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn appendix_ai_unload_model() -> i32 {
+    match AiEngine::unload_model() {
+        Ok(_) => 0,
+        Err(_) => -1,
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn appendix_ai_status() -> *mut c_char {
+    let status = AiEngine::get_status();
+    match serde_json::to_string(&status) {
+        Ok(json_str) => match CString::new(json_str) {
+            Ok(c_string) => c_string.into_raw(),
+            Err(_) => std::ptr::null_mut(),
+        },
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+#[no_mangle]
 pub extern "C" fn appendix_ai_rewrite(text: *const c_char, mode: i32) -> *mut c_char {
     if text.is_null() {
         return std::ptr::null_mut();
@@ -202,15 +329,8 @@ pub extern "C" fn appendix_ai_rewrite(text: *const c_char, mode: i32) -> *mut c_
         Err(_) => return std::ptr::null_mut(),
     };
 
-    let rewrite_mode = RewriteMode::from_i32(mode);
-    let revised = rewrite_mode.heuristic_fallback(input);
-
-    let result = RewriteResult {
-        original: input.to_string(),
-        revised,
-        mode: rewrite_mode.title().to_string(),
-        engine: "Heuristic (Offline)".to_string(),
-    };
+    let rewrite_mode = RewriteMode::from_i32(mode).unwrap_or(RewriteMode::Rephrase);
+    let result = AiEngine::rewrite(input, rewrite_mode, None);
 
     match serde_json::to_string(&result) {
         Ok(json_str) => match CString::new(json_str) {
@@ -326,8 +446,30 @@ mod tests {
     }
 
     #[test]
+    fn test_c_abi_engine_lifecycle_and_linting() {
+        // 1. Create engine via C ABI with American English
+        let engine_ptr = appendix_engine_new(0);
+        assert!(!engine_ptr.is_null(), "Engine pointer must not be null");
+
+        // 2. Check text with known typo
+        let text = CString::new("This is an test sentence with recieve typo.").unwrap();
+        let lint_ptr = appendix_engine_check(engine_ptr, text.as_ptr());
+        assert!(!lint_ptr.is_null(), "Lint result must not be null");
+        let lint_json = unsafe { CStr::from_ptr(lint_ptr).to_str().unwrap() };
+        assert!(lint_json.contains("start"), "Must produce JSON lints");
+        appendix_string_free(lint_ptr);
+
+        // 3. Switch dialect to British English
+        appendix_engine_set_dialect(engine_ptr, 1);
+
+        // 4. Clean free
+        appendix_engine_free(engine_ptr);
+    }
+
+    #[test]
     fn test_c_abi_insights_and_rewrite() {
-        let sample = CString::new("In order to achieve great results, we must practice daily.").unwrap();
+        let sample =
+            CString::new("In order to achieve great results, we must practice daily.").unwrap();
         let insights_ptr = appendix_insights_analyze(sample.as_ptr());
         assert!(!insights_ptr.is_null());
         let insights_json = unsafe { CStr::from_ptr(insights_ptr).to_str().unwrap() };
@@ -337,7 +479,8 @@ mod tests {
         let rewrite_ptr = appendix_ai_rewrite(sample.as_ptr(), 5); // Make Concise
         assert!(!rewrite_ptr.is_null());
         let rewrite_json = unsafe { CStr::from_ptr(rewrite_ptr).to_str().unwrap() };
-        assert!(rewrite_json.contains("To achieve great results"));
+        assert!(rewrite_json.contains("Make Concise"));
+        assert!(rewrite_json.contains("status"));
         appendix_string_free(rewrite_ptr);
     }
 }

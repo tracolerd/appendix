@@ -94,6 +94,7 @@ class _KeyboardSettingsScreenState extends State<KeyboardSettingsScreen>
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isIOS = Theme.of(context).platform == TargetPlatform.iOS;
     final bg = isDark ? AppendixTheme.darkBackground : AppendixTheme.lightBackground;
 
     return Scaffold(
@@ -122,11 +123,15 @@ class _KeyboardSettingsScreenState extends State<KeyboardSettingsScreen>
                       // Step 1: Enable in Settings
                       _buildStepCard(
                         isDark: isDark,
+                        isIOS: isIOS,
                         stepNumber: 1,
-                        title: 'Enable Appendix Keyboard',
-                        description:
-                            'Add Appendix to your list of active keyboards in Android Settings.',
-                        isCompleted: _isImeEnabled,
+                        title: isIOS
+                            ? 'Enable Appendix Keyboard on iOS'
+                            : 'Enable Appendix Keyboard',
+                        description: isIOS
+                            ? 'Go to Settings > General > Keyboard > Keyboards > Add New Keyboard... and select "Appendix Keyboard".'
+                            : 'Add Appendix to your list of active keyboards in Android Settings.',
+                        isCompleted: isIOS ? false : _isImeEnabled,
                         actionLabel: 'Open Keyboard Settings',
                         actionIcon: Icons.settings,
                         onAction: _openSettings,
@@ -136,15 +141,23 @@ class _KeyboardSettingsScreenState extends State<KeyboardSettingsScreen>
                       // Step 2: Switch active IME
                       _buildStepCard(
                         isDark: isDark,
+                        isIOS: isIOS,
                         stepNumber: 2,
-                        title: 'Switch Default Input Method',
-                        description:
-                            'Choose Appendix Keyboard as your current typing method.',
-                        isCompleted: _isImeSelected,
-                        actionLabel: 'Select Input Method',
-                        actionIcon: Icons.keyboard,
-                        onAction: _openPicker,
+                        title: isIOS
+                            ? 'Switch to Appendix Keyboard'
+                            : 'Switch Default Input Method',
+                        description: isIOS
+                            ? 'In any text field, tap the Globe (🌐) icon to switch to Appendix Keyboard.'
+                            : 'Choose Appendix Keyboard as your current typing method.',
+                        isCompleted: isIOS ? false : _isImeSelected,
+                        actionLabel: isIOS ? 'Open Settings' : 'Select Input Method',
+                        actionIcon: isIOS ? Icons.open_in_new : Icons.keyboard,
+                        onAction: isIOS ? _openSettings : _openPicker,
                       ),
+                      const SizedBox(height: 24),
+
+                      // Product & Feature Boundaries
+                      _buildFeatureBoundaryCard(isDark),
                       const SizedBox(height: 24),
 
                       // Dialect Selection
@@ -158,6 +171,49 @@ class _KeyboardSettingsScreenState extends State<KeyboardSettingsScreen>
                 ),
               ),
             ),
+    );
+  }
+
+  Widget _buildFeatureBoundaryCard(bool isDark) {
+    final cardBg = isDark ? AppendixTheme.darkSurface : AppendixTheme.lightSurface;
+    final borderColor = isDark ? AppendixTheme.darkBorder : AppendixTheme.lightBorder;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: borderColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.info_outline, size: 20, color: AppendixTheme.accentBlue),
+              const SizedBox(width: 8),
+              Text(
+                'Product & Feature Boundaries',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                  color: isDark ? AppendixTheme.darkTextPrimary : AppendixTheme.lightTextPrimary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            '• System Keyboards (Android & iOS): Lightweight, fast, 100% offline text input with Harper grammar checking, spelling suggestions, and US/UK dialect support. Zero text collection or cloud transmission.\n\n'
+            '• Main Application: Full local neural AI rewriting (Qwen 2.5 0.5B SLM), readability and syllable insights, draft history, and editor tools remain inside the main Appendix app to protect system keyboard performance and memory limits.',
+            style: TextStyle(
+              fontSize: 13,
+              height: 1.4,
+              color: isDark ? AppendixTheme.darkTextSecondary : AppendixTheme.lightTextSecondary,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -205,6 +261,7 @@ class _KeyboardSettingsScreenState extends State<KeyboardSettingsScreen>
 
   Widget _buildStepCard({
     required bool isDark,
+    bool isIOS = false,
     required int stepNumber,
     required String title,
     required String description,
@@ -214,9 +271,11 @@ class _KeyboardSettingsScreenState extends State<KeyboardSettingsScreen>
     required VoidCallback onAction,
   }) {
     final cardBg = isDark ? AppendixTheme.darkSurface : AppendixTheme.lightSurface;
-    final borderColor = isCompleted
-        ? AppendixTheme.successGreen.withValues(alpha: 0.4)
-        : (isDark ? AppendixTheme.darkBorder : AppendixTheme.lightBorder);
+    final borderColor = isIOS
+        ? (isDark ? AppendixTheme.darkBorder : AppendixTheme.lightBorder)
+        : (isCompleted
+            ? AppendixTheme.successGreen.withValues(alpha: 0.4)
+            : (isDark ? AppendixTheme.darkBorder : AppendixTheme.lightBorder));
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -232,10 +291,12 @@ class _KeyboardSettingsScreenState extends State<KeyboardSettingsScreen>
             children: [
               CircleAvatar(
                 radius: 14,
-                backgroundColor: isCompleted
-                    ? AppendixTheme.successGreen
-                    : AppendixTheme.accentBlue,
-                child: isCompleted
+                backgroundColor: isIOS
+                    ? AppendixTheme.accentBlue
+                    : (isCompleted
+                        ? AppendixTheme.successGreen
+                        : AppendixTheme.accentBlue),
+                child: (!isIOS && isCompleted)
                     ? const Icon(Icons.check, size: 16, color: Colors.white)
                     : Text(
                         '$stepNumber',
@@ -259,15 +320,23 @@ class _KeyboardSettingsScreenState extends State<KeyboardSettingsScreen>
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: isCompleted
-                      ? AppendixTheme.successGreen.withValues(alpha: 0.15)
-                      : AppendixTheme.warningAmber.withValues(alpha: 0.15),
+                  color: isIOS
+                      ? AppendixTheme.accentBlue.withValues(alpha: 0.15)
+                      : (isCompleted
+                          ? AppendixTheme.successGreen.withValues(alpha: 0.15)
+                          : AppendixTheme.warningAmber.withValues(alpha: 0.15)),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  isCompleted ? 'Enabled' : 'Action Required',
+                  isIOS
+                      ? 'iOS Guide'
+                      : (isCompleted ? 'Enabled' : 'Action Required'),
                   style: TextStyle(
-                    color: isCompleted ? AppendixTheme.successGreen : AppendixTheme.warningAmber,
+                    color: isIOS
+                        ? AppendixTheme.accentBlue
+                        : (isCompleted
+                            ? AppendixTheme.successGreen
+                            : AppendixTheme.warningAmber),
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                   ),
@@ -289,10 +358,10 @@ class _KeyboardSettingsScreenState extends State<KeyboardSettingsScreen>
             icon: Icon(actionIcon, size: 18),
             label: Text(actionLabel),
             style: FilledButton.styleFrom(
-              backgroundColor: isCompleted
+              backgroundColor: (!isIOS && isCompleted)
                   ? (isDark ? AppendixTheme.darkBorder : AppendixTheme.lightBorder)
                   : AppendixTheme.accentBlue,
-              foregroundColor: isCompleted
+              foregroundColor: (!isIOS && isCompleted)
                   ? (isDark ? AppendixTheme.darkTextPrimary : AppendixTheme.lightTextPrimary)
                   : Colors.white,
             ),
@@ -329,6 +398,15 @@ class _KeyboardSettingsScreenState extends State<KeyboardSettingsScreen>
             style: TextStyle(
               color: isDark ? AppendixTheme.darkTextSecondary : AppendixTheme.lightTextSecondary,
               fontSize: 13,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Note: Under iOS privacy isolation (RequestsOpenAccess=false), host app settings and keyboard extension settings cannot be synchronized via shared storage. The host app uses this setting for in-app grammar and editor functions, while the iOS keyboard uses its own default (US English) with a direct toggle on the keyboard.',
+            style: TextStyle(
+              fontSize: 12,
+              fontStyle: FontStyle.italic,
+              color: isDark ? AppendixTheme.darkTextTertiary : AppendixTheme.lightTextTertiary,
             ),
           ),
           const SizedBox(height: 16),
