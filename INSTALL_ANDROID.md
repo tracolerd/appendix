@@ -47,7 +47,7 @@ This guide covers installing the **Appendix** Android application and enabling t
 ### Option A: Sideloading the Release APK via ADB (Developers & Power Users)
 
 1. Connect your Android device with USB Debugging enabled in **Developer Options**.
-2. Download `appendix-android.apk` and `appendix-android.sha256` from [GitHub Releases](https://github.com/tracolerd/appendix/releases).
+2. Download `appendix-android.apk` and `appendix-android-apk.sha256` from [GitHub Releases](https://github.com/tracolerd/appendix/releases).
 3. Verify integrity:
    ```bash
    sha256sum appendix-android.apk
@@ -76,7 +76,7 @@ Once installed, enable the keyboard to use offline grammar corrections, spell ch
 4. Locate **Appendix Keyboard** and toggle the switch to **ON**.
 5. Read the standard Android security disclaimer:
    > *"Attention: This input method may be able to collect all the text you type..."*
-   *Note: This is standard Android OS copy shown for ALL third-party keyboards. Appendix contains **zero network code** and **zero internet permissions**, making it mathematically impossible for keystrokes to leave your device.*
+   *Note: This is the standard Android warning shown for third-party keyboards. The current app manifest does not declare the INTERNET permission. Review the final APK permissions and the project's privacy notes before enabling any third-party keyboard.*
 6. Tap **OK** to activate.
 7. To use it: Open any text field, tap the small keyboard icon in the navigation bar (or swipe down the notification shade), and select **Appendix Keyboard**.
 
