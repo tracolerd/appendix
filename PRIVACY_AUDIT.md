@@ -1,86 +1,75 @@
-# Appendix — Privacy & Zero-Telemetry Audit Report
+# Appendix — Privacy Implementation Notes
 
-**Audit Date**: 2026-11-15  
-**Version**: 0.1.0  
-**License**: Apache-2.0  
-**Audit Scope**: Complete codebase inspection (`rust/`, `app/lib/`, `app/android/`, `app/ios/`, `app/macos/`, `models/`).
+**Review date:** 17 November 2026  
+**Project version:** 0.2.0  
+**Review type:** Repository source, dependency manifest, and platform-configuration review
 
----
+> This document records implementation details visible in the repository. It is not an independent penetration test, formal security certification, or proof that every runtime path on every supported operating system has been exhaustively tested.
 
-## 1. Executive Summary
+## 1. Design intent
 
-Appendix is explicitly engineered from the ground up as a **100% offline, privacy-first English writing assistant**. Unlike commercial writing assistants (Grammarly, QuillBot, Wordtune), Appendix sends **zero bytes of text, telemetry, usage statistics, or user metadata** over any network connection.
+Appendix is designed to perform grammar checking, writing insights, draft-history operations, heuristic rewriting, and optional imported-model inference locally on the user's device. The project does not require an account or a hosted writing/AI service for its core local workflows.
 
-This document records the architectural guarantees, automated scan results, and platform permission declarations that mathematically enforce offline privacy.
+The optional Qwen GGUF model is obtained separately by the user and stored locally. It is not bundled in the platform installers.
 
----
+## 2. Platform configuration reviewed
 
-## 2. Platform Permission & Sandbox Audit
+### Android
 
-### A. Android Platform
-- **Manifest Location**: `app/android/app/src/main/AndroidManifest.xml`
-- **Internet Permission Audit**:
-  ```xml
-  <!-- Checked: android.permission.INTERNET is NOT declared -->
-  ```
-  - Result: **CLEAN**. The application does NOT request or possess `android.permission.INTERNET`. The Android Linux kernel automatically drops any network socket operations attempted by the process.
-- **Declared Permissions**:
-  - `android.permission.VIBRATE`: Required exclusively for tactile haptic feedback during keyboard key presses.
-  - `android.permission.BIND_INPUT_METHOD`: Required by Android OS for system-wide virtual keyboard services (`InputMethodService`).
+File reviewed: app/android/app/src/main/AndroidManifest.xml
 
-### B. iOS & iPadOS Platform
-- **Extension Plist Location**: `app/ios/AppendixKeyboard/Info.plist`
-- **Network Isolation Audit**:
-  ```xml
-  <key>NSExtensionAttributes</key>
-  <dict>
-      <key>RequestsOpenAccess</key>
-      <false/>
-  </dict>
-  ```
-  - Result: **CLEAN**. By declaring `RequestsOpenAccess = false`, Apple's iOS security sandbox enforces strict local execution. The keyboard extension cannot access the network, location services, contacts, camera, or microphone. Any socket invocation results in immediate kernel-level termination.
-- **Container App Communication**:
-  - Configuration sharing (US vs. UK dialect) occurs solely via local `UserDefaults(suiteName: "group.org.appendix.appendix")` stored in memory and local flash storage on the device.
+The manifest declares:
+- android.permission.VIBRATE for keyboard haptic feedback.
+- android.permission.BIND_INPUT_METHOD on the native keyboard service.
 
-### C. macOS & Windows Desktop
-- **Sandboxing**: `app/macos/Runner/Release.entitlements` enforces app sandboxing without network client entitlements (`com.apple.security.network.client` is absent).
-- **Windows**: The standalone binary (`appendix.exe` + `appendix_core.dll`) communicates exclusively with local RAM and local SQLite storage (`history.db`).
+The manifest does **not** declare android.permission.INTERNET. This is a useful platform-level restriction on ordinary app network access. Re-check the final packaged APK's merged manifest when producing a release.
 
----
+### iOS keyboard extension
 
-## 3. Dependency & Telemetry Audit
+File reviewed: app/ios/AppendixKeyboard/Info.plist
 
-Every dependency across both Rust and Flutter packages has been audited for embedded telemetry, tracking, or network calls:
+The keyboard extension declares RequestsOpenAccess = false. The extension therefore does not request Apple's Open Access capability.
 
-| Package / Crate | Ecosystem | Purpose | Telemetry Status |
-|---|---|---|---|
-| `harper-core 3.2.0` | Rust | Rule-based grammar and spell checking | **Zero network calls. 100% local.** |
-| `rusqlite 0.33` | Rust | Embedded SQLite storage | **Zero network calls. Bundled C SQLite.** |
-| `serde` & `serde_json` | Rust | JSON serialization | **Zero network calls.** |
-| `chrono` | Rust | Local timestamps for draft history | **Zero network calls.** |
-| `jni 0.21` | Rust | Android JNI interop | **Zero network calls.** |
-| `flutter` (Dart 3.14) | Dart | UI framework | **Zero analytics. Telemetry disabled.** |
-| `ffi` | Dart | Direct C ABI memory interop | **Zero network calls.** |
+This setting applies to the keyboard extension. It should not be represented as independent proof about every possible behavior of the containing app or every operating-system interaction. The keyboard's dialect preference is stored locally; cross-process App Group synchronization is not currently implemented.
 
-### Forbidden SDK Checklist:
-- [x] **Firebase Analytics / Crashlytics**: NOT PRESENT.
-- [x] **Google Analytics**: NOT PRESENT.
-- [x] **Mixpanel / Amplitude / PostHog**: NOT PRESENT.
-- [x] **Sentry / Bugsnag**: NOT PRESENT.
-- [x] **OpenAI / Claude / Gemini Cloud APIs**: NOT PRESENT.
-- [x] **Background HTTP daemons**: NOT PRESENT.
+### macOS
 
----
+File reviewed: app/macos/Runner/Release.entitlements
 
-## 4. Local AI & Model Storage Policy
+The release entitlement enables App Sandbox and does not declare com.apple.security.network.client. This is evidence of a sandboxed configuration without the explicit network-client entitlement. It is not a substitute for runtime network testing or a complete review of all macOS entitlements and signing behavior.
 
-1. **Storage Location**: Models reside in the user's local application data directory or `models/` directory on their physical disk.
-2. **Inference**: Inference runs strictly on local CPU / NPU / GPU via local runtimes (`llama.cpp` / ONNX Runtime).
-3. **No External Weights**: Weights are downloaded voluntarily and manually by the user or pre-packaged via release assets. The application never initiates automated remote downloads without explicit user command.
-4. **Draft History**: Saved drafts are kept in a local SQLite file (`history.db`) in the application's private storage, encrypted with user-level OS file protection.
+### Windows
 
----
+The Windows desktop application uses the local Flutter runner and Rust native library. This source review did not include a packet-capture test of the Windows release executable. Do not interpret the architecture description alone as an independently verified network-isolation certification.
 
-## 5. Audit Certification
+## 3. Dependencies and local processing
 
-Appendix complies 100% with the open-source offline charter. It represents a fully private, autonomous alternative for sensitive documents, legal writing, journalism, healthcare, and enterprise communication where data leakage to third-party cloud servers is strictly unacceptable.
+The direct Flutter dependencies in app/pubspec.yaml are Flutter SDK, cupertino_icons, and ffi. The Rust manifest includes Harper Core, Candle components, tokenizers, SQLite, serialization, JNI, and supporting utility crates. No first-party cloud writing API or analytics SDK is configured in those direct dependency lists.
+
+This review does not constitute a complete audit of every transitive dependency, build tool, or platform runtime.
+
+## 4. User data and model handling
+
+- Grammar checks and writing analytics are performed by the local Rust engine.
+- Draft history uses local SQLite storage.
+- The optional model is manually obtained and imported by the user; it is not fetched automatically by the release installer.
+- The 0.5B model's expected SHA-256 is documented in models/model_manifest.json. Verify the actual downloaded file against that manifest before use.
+- This review does not claim application-level encryption of the SQLite history database.
+
+## 5. Verification steps for release reviewers
+
+Before publishing a new binary, reviewers should independently:
+
+1. Inspect the APK's merged permissions and confirm the INTERNET permission is absent.
+2. Inspect the iOS keyboard extension's final packaged Info.plist and verify RequestsOpenAccess remains false.
+3. Inspect the macOS app's signed entitlements after packaging.
+4. Run network monitoring on each released platform if a strict no-network guarantee is required.
+5. Review dependency updates and regenerate package checksums for every release.
+
+Example Android permission inspection:
+
+    aapt dump permissions appendix-android.apk
+
+## 6. Scope and limitations
+
+This document is a project-maintainer review of selected source files and manifests. It is not an external audit, penetration test, notarization result, platform-store approval, or guarantee against every possible third-party dependency or operating-system behavior. Build-time telemetry from developer tools is separate from the behavior of the installed Appendix application.

@@ -25,6 +25,7 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.50.0'
           channel: 'stable'
 
       - name: Build Rust Core Release DLL
@@ -79,6 +80,7 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.50.0'
           channel: 'stable'
 
       - name: Setup Rust & Android NDK Targets
@@ -153,6 +155,7 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.50.0'
           channel: 'stable'
 
       - name: Compile macOS Universal dylib
@@ -175,7 +178,9 @@ jobs:
       - name: Package macOS Artifact
         run: |
           mkdir -p dist
-          cp LICENSE README.md THIRD_PARTY_NOTICES.md INSTALL_MACOS.md app/build/macos/Build/Products/Release/ 2>/dev/null || true
+          APP_PATH="app/build/macos/Build/Products/Release/appendix.app"
+          test -d "$APP_PATH"
+          test -f "$APP_PATH/Contents/Frameworks/libappendix_core.dylib"
           (cd app/build/macos/Build/Products/Release && zip -r -y "${GITHUB_WORKSPACE}/dist/appendix-macos.zip" appendix.app)
           shasum -a 256 dist/appendix-macos.zip | sed 's|dist/||' > dist/appendix-macos.sha256
 
@@ -205,6 +210,7 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.50.0'
           channel: 'stable'
 
       - name: Install Dependencies
@@ -222,7 +228,7 @@ jobs:
 
   publish-release:
     name: Publish GitHub Release
-    needs: [build-windows, build-android, build-macos, validate-ios]
+    needs: [build-windows, build-android, build-macos]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -254,12 +260,20 @@ jobs:
           cp models/model_manifest.json release_assets/
           cd release_assets
           cat *.sha256 > SHA256SUMS.txt
-          rm -f *.sha256
 
       - name: Draft GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: release_assets/*
+          body: |
+            Appendix v0.2.0 is an early testing release for Windows, macOS, and Android.
+
+            - Windows: unsigned portable ZIP; SmartScreen may warn.
+            - macOS: universal app ZIP; not Developer ID signed or notarized.
+            - Android: debug-signed APK for sideloading and evaluation only; not Play Store ready.
+            - iOS: source and Simulator-tested app/keyboard are included in the repository, but there is no signed IPA or App Store release. Physical-device signing, provisioning, and App Store work remain pending.
+
+            Verify downloaded packages with SHA256SUMS.txt.
           draft: false
           prerelease: false
           generate_release_notes: true
