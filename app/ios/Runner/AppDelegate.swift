@@ -16,7 +16,7 @@ import UIKit
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
 
-    let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "AppendixImePlugin")
+    guard let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "AppendixImePlugin") else { return }
     let messenger = registrar.messenger()
     let channel = FlutterMethodChannel(name: channelName, binaryMessenger: messenger)
 

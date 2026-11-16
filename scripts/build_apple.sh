@@ -39,9 +39,12 @@ echo "✓ Created Universal dylib: ${MACOS_OUT_DIR}/libappendix_core.dylib"
 echo "--> Compiling for iOS Devices and Simulators..."
 rustup target add aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios || true
 
-cargo build --release --target aarch64-apple-ios
-cargo build --release --target aarch64-apple-ios-sim
-cargo build --release --target x86_64-apple-ios
+IOS_DEPLOYMENT_TARGET="${IPHONEOS_DEPLOYMENT_TARGET:-15.0}"
+echo "Using iOS minimum deployment target: ${IOS_DEPLOYMENT_TARGET}"
+
+IPHONEOS_DEPLOYMENT_TARGET="${IOS_DEPLOYMENT_TARGET}" cargo build --release --target aarch64-apple-ios
+IPHONEOS_DEPLOYMENT_TARGET="${IOS_DEPLOYMENT_TARGET}" cargo build --release --target aarch64-apple-ios-sim
+IPHONEOS_DEPLOYMENT_TARGET="${IOS_DEPLOYMENT_TARGET}" cargo build --release --target x86_64-apple-ios
 
 echo "--> Combining iOS Simulator Binaries..."
 mkdir -p "${RUST_DIR}/target/ios-sim-universal/release"

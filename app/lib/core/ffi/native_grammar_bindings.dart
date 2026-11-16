@@ -1,6 +1,8 @@
 import 'dart:ffi' as ffi;
 import 'dart:io';
+
 import 'package:ffi/ffi.dart';
+
 import 'grammar_models.dart';
 
 // Native C Types
@@ -11,35 +13,59 @@ typedef _EngineFreeC = ffi.Void Function(ffi.Pointer<ffi.Void> engine);
 typedef _EngineFreeDart = void Function(ffi.Pointer<ffi.Void> engine);
 
 typedef _EngineSetDialectC = ffi.Void Function(
-    ffi.Pointer<ffi.Void> engine, ffi.Int32 dialect);
+  ffi.Pointer<ffi.Void> engine,
+  ffi.Int32 dialect,
+);
 typedef _EngineSetDialectDart = void Function(
-    ffi.Pointer<ffi.Void> engine, int dialect);
+  ffi.Pointer<ffi.Void> engine,
+  int dialect,
+);
 
 typedef _EngineCheckC = ffi.Pointer<Utf8> Function(
-    ffi.Pointer<ffi.Void> engine, ffi.Pointer<Utf8> text);
+  ffi.Pointer<ffi.Void> engine,
+  ffi.Pointer<Utf8> text,
+);
 typedef _EngineCheckDart = ffi.Pointer<Utf8> Function(
-    ffi.Pointer<ffi.Void> engine, ffi.Pointer<Utf8> text);
+  ffi.Pointer<ffi.Void> engine,
+  ffi.Pointer<Utf8> text,
+);
 
 typedef _InsightsAnalyzeC = ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> text);
-typedef _InsightsAnalyzeDart = ffi.Pointer<Utf8> Function(ffi.Pointer<Utf8> text);
+typedef _InsightsAnalyzeDart = ffi.Pointer<Utf8> Function(
+  ffi.Pointer<Utf8> text,
+);
 
 typedef _AiRewriteC = ffi.Pointer<Utf8> Function(
-    ffi.Pointer<Utf8> text, ffi.Int32 mode);
+  ffi.Pointer<Utf8> text,
+  ffi.Int32 mode,
+);
 typedef _AiRewriteDart = ffi.Pointer<Utf8> Function(
-    ffi.Pointer<Utf8> text, int mode);
+  ffi.Pointer<Utf8> text,
+  int mode,
+);
 
 typedef _AiLoadModelC = ffi.Pointer<Utf8> Function(
-    ffi.Pointer<Utf8> modelPath, ffi.Pointer<Utf8> tokenizerPath, ffi.Int32 verifyChecksum);
+  ffi.Pointer<Utf8> modelPath,
+  ffi.Pointer<Utf8> tokenizerPath,
+  ffi.Int32 verifyChecksum,
+);
 typedef _AiLoadModelDart = ffi.Pointer<Utf8> Function(
-    ffi.Pointer<Utf8> modelPath, ffi.Pointer<Utf8> tokenizerPath, int verifyChecksum);
+  ffi.Pointer<Utf8> modelPath,
+  ffi.Pointer<Utf8> tokenizerPath,
+  int verifyChecksum,
+);
 
 typedef _AiCancelC = ffi.Void Function();
 typedef _AiCancelDart = void Function();
 
 typedef _AiVerifyModelC = ffi.Pointer<Utf8> Function(
-    ffi.Pointer<Utf8> filePath, ffi.Pointer<Utf8> expectedSha256);
+  ffi.Pointer<Utf8> filePath,
+  ffi.Pointer<Utf8> expectedSha256,
+);
 typedef _AiVerifyModelDart = ffi.Pointer<Utf8> Function(
-    ffi.Pointer<Utf8> filePath, ffi.Pointer<Utf8> expectedSha256);
+  ffi.Pointer<Utf8> filePath,
+  ffi.Pointer<Utf8> expectedSha256,
+);
 
 typedef _AiUnloadModelC = ffi.Int32 Function();
 typedef _AiUnloadModelDart = int Function();
@@ -47,20 +73,33 @@ typedef _AiUnloadModelDart = int Function();
 typedef _AiStatusC = ffi.Pointer<Utf8> Function();
 typedef _AiStatusDart = ffi.Pointer<Utf8> Function();
 
-typedef _HistorySaveC = ffi.Int64 Function(ffi.Pointer<Utf8> dbPath,
-    ffi.Pointer<Utf8> content, ffi.Size wordCount, ffi.Double readability);
-typedef _HistorySaveDart = int Function(ffi.Pointer<Utf8> dbPath,
-    ffi.Pointer<Utf8> content, int wordCount, double readability);
+typedef _HistorySaveC = ffi.Int64 Function(
+  ffi.Pointer<Utf8> dbPath,
+  ffi.Pointer<Utf8> content,
+  ffi.Size wordCount,
+  ffi.Double readability,
+);
+typedef _HistorySaveDart = int Function(
+  ffi.Pointer<Utf8> dbPath,
+  ffi.Pointer<Utf8> content,
+  int wordCount,
+  double readability,
+);
 
 typedef _HistoryListC = ffi.Pointer<Utf8> Function(
-    ffi.Pointer<Utf8> dbPath, ffi.Size limit);
+  ffi.Pointer<Utf8> dbPath,
+  ffi.Size limit,
+);
 typedef _HistoryListDart = ffi.Pointer<Utf8> Function(
-    ffi.Pointer<Utf8> dbPath, int limit);
+  ffi.Pointer<Utf8> dbPath,
+  int limit,
+);
 
 typedef _HistoryDeleteC = ffi.Int32 Function(
-    ffi.Pointer<Utf8> dbPath, ffi.Int64 id);
-typedef _HistoryDeleteDart = int Function(
-    ffi.Pointer<Utf8> dbPath, int id);
+  ffi.Pointer<Utf8> dbPath,
+  ffi.Int64 id,
+);
+typedef _HistoryDeleteDart = int Function(ffi.Pointer<Utf8> dbPath, int id);
 
 typedef _HistoryClearC = ffi.Int32 Function(ffi.Pointer<Utf8> dbPath);
 typedef _HistoryClearDart = int Function(ffi.Pointer<Utf8> dbPath);
@@ -71,7 +110,8 @@ typedef _StringFreeDart = void Function(ffi.Pointer<Utf8> ptr);
 /// High-level native bridge to the Rust appendix_core engine.
 class NativeGrammarEngine {
   static NativeGrammarEngine? _instance;
-  static NativeGrammarEngine get instance => _instance ??= NativeGrammarEngine._();
+  static NativeGrammarEngine get instance =>
+      _instance ??= NativeGrammarEngine._();
 
   ffi.DynamicLibrary? _dylib;
   ffi.Pointer<ffi.Void>? _enginePtr;
@@ -105,35 +145,63 @@ class NativeGrammarEngine {
     try {
       _dylib = _loadLibrary();
       if (_dylib != null) {
-        _engineNew = _dylib!
-            .lookupFunction<_EngineNewC, _EngineNewDart>('appendix_engine_new');
-        _engineFree = _dylib!
-            .lookupFunction<_EngineFreeC, _EngineFreeDart>('appendix_engine_free');
-        _engineSetDialect = _dylib!.lookupFunction<_EngineSetDialectC,
-            _EngineSetDialectDart>('appendix_engine_set_dialect');
-        _engineCheck = _dylib!
-            .lookupFunction<_EngineCheckC, _EngineCheckDart>('appendix_engine_check');
-        _insightsAnalyze = _dylib!.lookupFunction<_InsightsAnalyzeC,
-            _InsightsAnalyzeDart>('appendix_insights_analyze');
-        _aiRewrite = _dylib!
-            .lookupFunction<_AiRewriteC, _AiRewriteDart>('appendix_ai_rewrite');
+        _engineNew = _dylib!.lookupFunction<_EngineNewC, _EngineNewDart>(
+          'appendix_engine_new',
+        );
+        _engineFree = _dylib!.lookupFunction<_EngineFreeC, _EngineFreeDart>(
+          'appendix_engine_free',
+        );
+        _engineSetDialect = _dylib!
+            .lookupFunction<_EngineSetDialectC, _EngineSetDialectDart>(
+              'appendix_engine_set_dialect',
+            );
+        _engineCheck = _dylib!.lookupFunction<_EngineCheckC, _EngineCheckDart>(
+          'appendix_engine_check',
+        );
+        _insightsAnalyze = _dylib!
+            .lookupFunction<_InsightsAnalyzeC, _InsightsAnalyzeDart>(
+              'appendix_insights_analyze',
+            );
+        _aiRewrite = _dylib!.lookupFunction<_AiRewriteC, _AiRewriteDart>(
+          'appendix_ai_rewrite',
+        );
         try {
-          _aiLoadModel = _dylib!.lookupFunction<_AiLoadModelC, _AiLoadModelDart>('appendix_ai_load_model');
-          _aiUnloadModel = _dylib!.lookupFunction<_AiUnloadModelC, _AiUnloadModelDart>('appendix_ai_unload_model');
-          _aiStatus = _dylib!.lookupFunction<_AiStatusC, _AiStatusDart>('appendix_ai_status');
-          _aiCancel = _dylib!.lookupFunction<_AiCancelC, _AiCancelDart>('appendix_ai_cancel');
-          _aiVerifyModel = _dylib!.lookupFunction<_AiVerifyModelC, _AiVerifyModelDart>('appendix_ai_verify_model');
+          _aiLoadModel = _dylib!
+              .lookupFunction<_AiLoadModelC, _AiLoadModelDart>(
+                'appendix_ai_load_model',
+              );
+          _aiUnloadModel = _dylib!
+              .lookupFunction<_AiUnloadModelC, _AiUnloadModelDart>(
+                'appendix_ai_unload_model',
+              );
+          _aiStatus = _dylib!.lookupFunction<_AiStatusC, _AiStatusDart>(
+            'appendix_ai_status',
+          );
+          _aiCancel = _dylib!.lookupFunction<_AiCancelC, _AiCancelDart>(
+            'appendix_ai_cancel',
+          );
+          _aiVerifyModel = _dylib!
+              .lookupFunction<_AiVerifyModelC, _AiVerifyModelDart>(
+                'appendix_ai_verify_model',
+              );
         } catch (_) {}
-        _historySave = _dylib!.lookupFunction<_HistorySaveC,
-            _HistorySaveDart>('appendix_history_save');
-        _historyList = _dylib!.lookupFunction<_HistoryListC,
-            _HistoryListDart>('appendix_history_list');
-        _historyDelete = _dylib!.lookupFunction<_HistoryDeleteC,
-            _HistoryDeleteDart>('appendix_history_delete');
-        _historyClear = _dylib!.lookupFunction<_HistoryClearC,
-            _HistoryClearDart>('appendix_history_clear');
-        _stringFree = _dylib!
-            .lookupFunction<_StringFreeC, _StringFreeDart>('appendix_string_free');
+        _historySave = _dylib!.lookupFunction<_HistorySaveC, _HistorySaveDart>(
+          'appendix_history_save',
+        );
+        _historyList = _dylib!.lookupFunction<_HistoryListC, _HistoryListDart>(
+          'appendix_history_list',
+        );
+        _historyDelete = _dylib!
+            .lookupFunction<_HistoryDeleteC, _HistoryDeleteDart>(
+              'appendix_history_delete',
+            );
+        _historyClear = _dylib!
+            .lookupFunction<_HistoryClearC, _HistoryClearDart>(
+              'appendix_history_clear',
+            );
+        _stringFree = _dylib!.lookupFunction<_StringFreeC, _StringFreeDart>(
+          'appendix_string_free',
+        );
 
         _enginePtr = _engineNew!(_currentDialect.ffiValue);
         _isInitialized = true;
@@ -168,16 +236,17 @@ class NativeGrammarEngine {
         return ffi.DynamicLibrary.open('appendix_core.dll');
       } catch (_) {}
     } else if (Platform.isMacOS) {
+      final executableDirectory = File(Platform.resolvedExecutable).parent.path;
+
       final macCandidates = [
-        'libappendix_core.dylib',
-        '../Frameworks/libappendix_core.dylib',
-        '@rpath/libappendix_core.dylib',
-        '../rust/target/release/libappendix_core.dylib',
-        '../rust/target/debug/libappendix_core.dylib',
+        '$executableDirectory/../Frameworks/libappendix_core.dylib',
       ];
+
       for (final p in macCandidates) {
         try {
-          return ffi.DynamicLibrary.open(p);
+          if (File(p).existsSync()) {
+            return ffi.DynamicLibrary.open(p);
+          }
         } catch (_) {}
       }
     } else if (Platform.isIOS) {
@@ -206,7 +275,10 @@ class NativeGrammarEngine {
   List<LintIssue> checkText(String text) {
     if (text.trim().isEmpty) return [];
 
-    if (_isInitialized && _enginePtr != null && _engineCheck != null && _stringFree != null) {
+    if (_isInitialized &&
+        _enginePtr != null &&
+        _engineCheck != null &&
+        _stringFree != null) {
       final nativeText = text.toNativeUtf8();
       try {
         final resultPtr = _engineCheck!(_enginePtr!, nativeText);
@@ -255,7 +327,12 @@ class NativeGrammarEngine {
   /// Perform AI tone or style rewriting
   RewriteResult rewriteText(String text, RewriteMode mode) {
     if (text.trim().isEmpty) {
-      return RewriteResult(original: text, revised: text, mode: mode.title, engine: 'Offline');
+      return RewriteResult(
+        original: text,
+        revised: text,
+        mode: mode.title,
+        engine: 'Offline',
+      );
     }
 
     if (_isInitialized && _aiRewrite != null && _stringFree != null) {
@@ -280,12 +357,20 @@ class NativeGrammarEngine {
   }
 
   /// Load a local GGUF AI model into memory with optional SHA-256 verification
-  AiModelStatus loadAiModel(String modelPath, String tokenizerPath, {bool verifyChecksum = false}) {
+  AiModelStatus loadAiModel(
+    String modelPath,
+    String tokenizerPath, {
+    bool verifyChecksum = false,
+  }) {
     if (_isInitialized && _aiLoadModel != null && _stringFree != null) {
       final nativeModel = modelPath.toNativeUtf8();
       final nativeTokenizer = tokenizerPath.toNativeUtf8();
       try {
-        final resultPtr = _aiLoadModel!(nativeModel, nativeTokenizer, verifyChecksum ? 1 : 0);
+        final resultPtr = _aiLoadModel!(
+          nativeModel,
+          nativeTokenizer,
+          verifyChecksum ? 1 : 0,
+        );
         if (resultPtr != ffi.nullptr) {
           try {
             final jsonStr = resultPtr.toDartString();
@@ -380,7 +465,12 @@ class NativeGrammarEngine {
   }
 
   /// Save snapshot to local SQLite history
-  int saveHistory(String dbPath, String content, int wordCount, double readability) {
+  int saveHistory(
+    String dbPath,
+    String content,
+    int wordCount,
+    double readability,
+  ) {
     if (_isInitialized && _historySave != null) {
       final nativeDb = dbPath.toNativeUtf8();
       final nativeContent = content.toNativeUtf8();
@@ -453,58 +543,77 @@ class NativeGrammarEngine {
   static List<LintIssue> _fallbackCheck(String text, EnglishDialect dialect) {
     final issues = <LintIssue>[];
 
-    final anArticleRegex = RegExp(r'\b(an)\s+([bcdfghjklmnpqrstvwxyz][a-z]*)', caseSensitive: false);
+    final anArticleRegex = RegExp(
+      r'\b(an)\s+([bcdfghjklmnpqrstvwxyz][a-z]*)',
+      caseSensitive: false,
+    );
     for (final match in anArticleRegex.allMatches(text)) {
       final nextWord = match.group(2)!.toLowerCase();
       if (!['hour', 'honest', 'honor', 'heir'].contains(nextWord)) {
-        issues.add(LintIssue(
-          start: match.start,
-          end: match.start + 2,
-          message: 'Incorrect indefinite article before consonant sound.',
-          suggestions: [
-            GrammarSuggestion(
-              replacement: match.group(1) == 'An' ? 'A' : 'a',
-              description: 'Use "a" before words starting with a consonant sound',
-            ),
-          ],
-          lintKind: 'Grammar',
-        ));
+        issues.add(
+          LintIssue(
+            start: match.start,
+            end: match.start + 2,
+            message: 'Incorrect indefinite article before consonant sound.',
+            suggestions: [
+              GrammarSuggestion(
+                replacement: match.group(1) == 'An' ? 'A' : 'a',
+                description:
+                    'Use "a" before words starting with a consonant sound',
+              ),
+            ],
+            lintKind: 'Grammar',
+          ),
+        );
       }
     }
 
-    final aArticleRegex = RegExp(r'\b(a)\s+([aeiou][a-z]*)', caseSensitive: false);
+    final aArticleRegex = RegExp(
+      r'\b(a)\s+([aeiou][a-z]*)',
+      caseSensitive: false,
+    );
     for (final match in aArticleRegex.allMatches(text)) {
       final nextWord = match.group(2)!.toLowerCase();
-      if (!nextWord.startsWith('uni') && !nextWord.startsWith('use') && nextWord != 'one') {
-        issues.add(LintIssue(
-          start: match.start,
-          end: match.start + 1,
-          message: 'Incorrect indefinite article before vowel sound.',
-          suggestions: [
-            GrammarSuggestion(
-              replacement: match.group(1) == 'A' ? 'An' : 'an',
-              description: 'Use "an" before words starting with a vowel sound',
-            ),
-          ],
-          lintKind: 'Grammar',
-        ));
+      if (!nextWord.startsWith('uni') &&
+          !nextWord.startsWith('use') &&
+          nextWord != 'one') {
+        issues.add(
+          LintIssue(
+            start: match.start,
+            end: match.start + 1,
+            message: 'Incorrect indefinite article before vowel sound.',
+            suggestions: [
+              GrammarSuggestion(
+                replacement: match.group(1) == 'A' ? 'An' : 'an',
+                description:
+                    'Use "an" before words starting with a vowel sound',
+              ),
+            ],
+            lintKind: 'Grammar',
+          ),
+        );
       }
     }
 
-    final repeatedWordRegex = RegExp(r'\b([a-zA-Z]+)\s+\1\b', caseSensitive: false);
+    final repeatedWordRegex = RegExp(
+      r'\b([a-zA-Z]+)\s+\1\b',
+      caseSensitive: false,
+    );
     for (final match in repeatedWordRegex.allMatches(text)) {
-      issues.add(LintIssue(
-        start: match.start,
-        end: match.end,
-        message: 'Repeated word detected.',
-        suggestions: [
-          GrammarSuggestion(
-            replacement: match.group(1)!,
-            description: 'Remove repeated word',
-          ),
-        ],
-        lintKind: 'Repetition',
-      ));
+      issues.add(
+        LintIssue(
+          start: match.start,
+          end: match.end,
+          message: 'Repeated word detected.',
+          suggestions: [
+            GrammarSuggestion(
+              replacement: match.group(1)!,
+              description: 'Remove repeated word',
+            ),
+          ],
+          lintKind: 'Repetition',
+        ),
+      );
     }
 
     if (dialect == EnglishDialect.american) {
@@ -532,18 +641,21 @@ class NativeGrammarEngine {
           final replacement = isCapitalized
               ? entry.value[0].toUpperCase() + entry.value.substring(1)
               : entry.value;
-          issues.add(LintIssue(
-            start: match.start,
-            end: match.end,
-            message: 'British spelling detected. In American English, use "$replacement".',
-            suggestions: [
-              GrammarSuggestion(
-                replacement: replacement,
-                description: 'American English spelling',
-              ),
-            ],
-            lintKind: 'Dialect',
-          ));
+          issues.add(
+            LintIssue(
+              start: match.start,
+              end: match.end,
+              message:
+                  'British spelling detected. In American English, use "$replacement".',
+              suggestions: [
+                GrammarSuggestion(
+                  replacement: replacement,
+                  description: 'American English spelling',
+                ),
+              ],
+              lintKind: 'Dialect',
+            ),
+          );
         }
       }
     } else {
@@ -570,18 +682,21 @@ class NativeGrammarEngine {
           final replacement = isCapitalized
               ? entry.value[0].toUpperCase() + entry.value.substring(1)
               : entry.value;
-          issues.add(LintIssue(
-            start: match.start,
-            end: match.end,
-            message: 'American spelling detected. In British English, use "$replacement".',
-            suggestions: [
-              GrammarSuggestion(
-                replacement: replacement,
-                description: 'British English spelling',
-              ),
-            ],
-            lintKind: 'Dialect',
-          ));
+          issues.add(
+            LintIssue(
+              start: match.start,
+              end: match.end,
+              message:
+                  'American spelling detected. In British English, use "$replacement".',
+              suggestions: [
+                GrammarSuggestion(
+                  replacement: replacement,
+                  description: 'British English spelling',
+                ),
+              ],
+              lintKind: 'Dialect',
+            ),
+          );
         }
       }
     }
@@ -590,8 +705,15 @@ class NativeGrammarEngine {
   }
 
   static WritingInsights _fallbackInsights(String text) {
-    final words = text.trim().split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
-    final sentences = text.split(RegExp(r'[.!?]+(?:\s+|$)')).where((s) => s.trim().isNotEmpty).toList();
+    final words = text
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((w) => w.isNotEmpty)
+        .toList();
+    final sentences = text
+        .split(RegExp(r'[.!?]+(?:\s+|$)'))
+        .where((s) => s.trim().isNotEmpty)
+        .toList();
     final wordCount = words.length.clamp(1, 100000);
     final sentenceCount = sentences.length.clamp(1, 100000);
 

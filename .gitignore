@@ -94,3 +94,6 @@ models/tokenizer.json
 *.exp
 *.d
 *.rlib
+
+# Generated Apple platform artifacts
+app/ios/Frameworks/AppendixCore.xcframework/

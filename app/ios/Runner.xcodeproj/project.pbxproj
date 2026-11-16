@@ -19,6 +19,7 @@
 		A1B2C3D4294A000100000002 /* AppendixKeyboard.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = A1B2C3D4294A000100000003 /* AppendixKeyboard.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		A1B2C3D4294A00010000000F /* KeyboardViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4294A000100000006 /* KeyboardViewController.swift */; };
 		A1B2C3D4294A000100000010 /* NativeHarperBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4294A000100000007 /* NativeHarperBridge.swift */; };
+		A1B2C3D4294A000100000016 /* AppendixCore.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = A1B2C3D4294A000100000015 /* AppendixCore.xcframework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -85,6 +86,7 @@
 		A1B2C3D4294A000100000005 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A1B2C3D4294A000100000006 /* KeyboardViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardViewController.swift; sourceTree = "<group>"; };
 		A1B2C3D4294A000100000007 /* NativeHarperBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeHarperBridge.swift; sourceTree = "<group>"; };
+		A1B2C3D4294A000100000015 /* AppendixCore.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; path = Frameworks/AppendixCore.xcframework; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -100,6 +102,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A1B2C3D4294A000100000016 /* AppendixCore.xcframework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -132,6 +135,7 @@
 				9740EEB11CF90186004384FC /* Flutter */,
 				97C146F01CF9000F007C117D /* Runner */,
 				A1B2C3D4294A000100000009 /* AppendixKeyboard */,
+				A1B2C3D4294A000100000015 /* AppendixCore.xcframework */,
 				97C146EF1CF9000F007C117D /* Products */,
 				331C8082294A63A400263BE5 /* RunnerTests */,
 			);
@@ -202,9 +206,9 @@
 				97C146EA1CF9000F007C117D /* Sources */,
 				97C146EB1CF9000F007C117D /* Frameworks */,
 				97C146EC1CF9000F007C117D /* Resources */,
+				A1B2C3D4294A000100000001 /* Embed App Extensions */,
 				9705A1C41CF9048500538489 /* Embed Frameworks */,
 				3B06AD1E1E4923F5004D2608 /* Thin Binary */,
-				A1B2C3D4294A000100000001 /* Embed App Extensions */,
 			);
 			buildRules = (
 			);
@@ -464,6 +468,14 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 7AFA3C8E1D35360C0083082E /* Release.xcconfig */;
 			buildSettings = {
+				"OTHER_LDFLAGS[sdk=iphoneos*]" = (
+					"$(inherited)",
+					"-Wl,-force_load,$(PROJECT_DIR)/Frameworks/AppendixCore.xcframework/ios-arm64/libappendix_core.a",
+				);
+				"OTHER_LDFLAGS[sdk=iphonesimulator*]" = (
+					"$(inherited)",
+					"-Wl,-force_load,$(PROJECT_DIR)/Frameworks/AppendixCore.xcframework/ios-arm64_x86_64-simulator/libappendix_core.a",
+				);
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
@@ -645,6 +657,14 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 9740EEB21CF90195004384FC /* Debug.xcconfig */;
 			buildSettings = {
+				"OTHER_LDFLAGS[sdk=iphoneos*]" = (
+					"$(inherited)",
+					"-Wl,-force_load,$(PROJECT_DIR)/Frameworks/AppendixCore.xcframework/ios-arm64/libappendix_core.a",
+				);
+				"OTHER_LDFLAGS[sdk=iphonesimulator*]" = (
+					"$(inherited)",
+					"-Wl,-force_load,$(PROJECT_DIR)/Frameworks/AppendixCore.xcframework/ios-arm64_x86_64-simulator/libappendix_core.a",
+				);
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
@@ -667,6 +687,14 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 7AFA3C8E1D35360C0083082E /* Release.xcconfig */;
 			buildSettings = {
+				"OTHER_LDFLAGS[sdk=iphoneos*]" = (
+					"$(inherited)",
+					"-Wl,-force_load,$(PROJECT_DIR)/Frameworks/AppendixCore.xcframework/ios-arm64/libappendix_core.a",
+				);
+				"OTHER_LDFLAGS[sdk=iphonesimulator*]" = (
+					"$(inherited)",
+					"-Wl,-force_load,$(PROJECT_DIR)/Frameworks/AppendixCore.xcframework/ios-arm64_x86_64-simulator/libappendix_core.a",
+				);
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
