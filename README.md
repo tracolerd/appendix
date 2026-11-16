@@ -1,6 +1,6 @@
 # Appendix
 
-**An offline-first English writing assistant and system keyboard for Windows, macOS, Android, and iOS.**
+**An offline-first English writing assistant for Windows and macOS, with native mobile keyboards for Android and iOS.**
 
 [![CI](https://github.com/tracolerd/appendix/actions/workflows/ci.yml/badge.svg?branch=feat/local-ai-inference)](https://github.com/tracolerd/appendix/actions/workflows/ci.yml?query=branch%3Afeat%2Flocal-ai-inference)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
@@ -23,6 +23,8 @@ These are direct links to the latest GitHub Release assets.
 | **macOS (Universal)** | [Download Appendix for macOS](https://github.com/tracolerd/appendix/releases/latest/download/appendix-macos.zip) | App ZIP for Apple Silicon and Intel Macs |
 | **Android (64-bit)** | [Download Appendix APK](https://github.com/tracolerd/appendix/releases/latest/download/appendix-android.apk) | Debug-signed APK for sideloading and evaluation |
 | Android developers | [Download Android App Bundle](https://github.com/tracolerd/appendix/releases/latest/download/appendix-android.aab) | Debug-signed AAB for internal evaluation; not Play Store ready |
+
+The direct download URLs resolve after a tagged GitHub Release has published its assets. Until then, check the [Releases page](https://github.com/tracolerd/appendix/releases) for availability.
 
 **Checksums:** [SHA256SUMS.txt](https://github.com/tracolerd/appendix/releases/latest/download/SHA256SUMS.txt) contains SHA-256 hashes for the release packages. Verify a downloaded file before installing it.
 
