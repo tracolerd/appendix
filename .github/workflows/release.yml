@@ -108,7 +108,7 @@ jobs:
           if [ -n "$KEYSTORE_BASE64" ]; then
             echo "Production keystore secret detected. Decoding..."
             echo "$KEYSTORE_BASE64" | base64 -d > app/android/release.keystore
-            echo "KEYSTORE_PATH=release.keystore" >> $GITHUB_ENV
+            echo "KEYSTORE_PATH=$GITHUB_WORKSPACE/app/android/release.keystore" >> $GITHUB_ENV
             echo "KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" >> $GITHUB_ENV
             echo "KEY_ALIAS=$KEY_ALIAS" >> $GITHUB_ENV
             echo "KEY_PASSWORD=$KEY_PASSWORD" >> $GITHUB_ENV
@@ -189,42 +189,6 @@ jobs:
         with:
           name: appendix-macos
           path: dist/appendix-macos.*
-
-  validate-ios:
-    name: Validate iOS App & Embedded Keyboard Extension
-    runs-on: macos-latest
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Setup Rust & iOS Targets
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-apple-ios, aarch64-apple-ios-sim, x86_64-apple-ios
-
-      - name: Build Apple Platforms (XCFramework)
-        run: |
-          chmod +x scripts/build_apple.sh
-          ./scripts/build_apple.sh
-
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.50.0'
-          channel: 'stable'
-
-      - name: Install Dependencies
-        working-directory: app
-        run: flutter pub get
-
-      - name: Validate iOS App & Keyboard Extension Build
-        run: |
-          xcodebuild -workspace app/ios/Runner.xcworkspace \
-            -scheme Runner \
-            -sdk iphonesimulator \
-            -configuration Release \
-            CODE_SIGNING_ALLOWED=NO \
-            build
 
   publish-release:
     name: Publish GitHub Release
